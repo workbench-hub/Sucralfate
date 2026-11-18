@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sucralfate Procurement Interactive Dashboard (เฉพาะรายการที่ระบุจำนวนแน่นอน)</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Sarabun', 'Inter', sans-serif;
+      background-color: #f1f5f9;
+      color: #0f172a;
+    }
+    .editable-input {
+      transition: all 0.15s ease;
+    }
+    .editable-input:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+      background-color: #ffffff;
+    }
+  </style>
+</head>
+<body class="min-h-screen pb-12">
+  <!-- Top Header Banner -->
+  <header class="bg-gradient-to-r from-slate-900 via-blue-950 to-teal-900 text-white shadow-lg border-b border-white/10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div>
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/20 border border-teal-400/30 text-teal-200 text-xs font-semibold mb-2">
+          <span class="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></span>
+          INTERACTIVE & EDITABLE DASHBOARD • ชีท: รายการสั่งซื้อ Sucralfate
+        </div>
+        <h1 id="dashboardTitle" contenteditable="true" class="text-xl sm:text-2xl font-bold tracking-tight focus:outline-none focus:ring-2 focus:ring-teal-400 rounded px-1 -mx-1" title="คลิกเพื่อแก้ไขชื่อหัวข้อ Dashboard">
+          Dashboard สรุปยอดจัดซื้อยา Sucralfate รูปแบบยาน้ำ (เฉพาะรายการที่ระบุจำนวนแน่นอน)
+        </h1>
+        <p id="dashboardSubtitle" contenteditable="true" class="text-xs sm:text-sm text-slate-300 mt-1 focus:outline-none focus:ring-2 focus:ring-teal-400 rounded px-1 -mx-1" title="คลิกเพื่อแก้ไขคำอธิบายย่อย">
+          คัดกรองเฉพาะโครงการที่ระบุจำนวนจัดซื้อชัดเจน (ตัดรายการที่ซื้อรวมหลายรายการโดยไม่ระบุจำนวนออกทั้งหมด) • คลิกแก้ไขตัวเลขในตารางเพื่ออัปเดตกราฟแบบเรียลไทม์
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <button id="btnOpenAddModal" type="button" class="px-3.5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs sm:text-sm shadow transition flex items-center gap-1.5">
+          <span>+ เพิ่มรายการสั่งซื้อ</span>
+        </button>
+        <button id="btnExportCsv" type="button" class="px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm shadow transition flex items-center gap-1.5">
+          <span>ดาวน์โหลด CSV (เปิดใน Excel)</span>
+        </button>
+        <button id="btnResetData" type="button" class="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium text-xs sm:text-sm transition">
+          รีเซ็ตค่าเริ่มต้น
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 mt-6 space-y-6">
+    <!-- Toast Notification -->
+    <div id="toastBanner" class="hidden fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl border border-slate-700 flex items-center gap-3 text-sm">
+      <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+      <span id="toastMessage">อัปเดตข้อมูลและคำนวณกราฟใหม่เรียบร้อยแล้ว</span>
+    </div>
+
+    <!-- Quick Interactive Filter & Unit Price Simulator Bar -->
+    <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-500 mr-1">กรองตามขนาดบรรจุ:</span>
+        <button type="button" data-cat="all" class="cat-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-900 text-white shadow-sm transition">
+          ทั้งหมด (3 รูปแบบที่มีจำนวนแน่นอน)
+        </button>
+        <button type="button" data-cat="240mL" class="cat-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
+          1. ขวด 240 mL
+        </button>
+        <button type="button" data-cat="60mL" class="cat-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
+          2. ขวด 60 mL
+        </button>
+        <button type="button" data-cat="sachet" class="cat-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
+          3. แบบซอง 5 mL (Sachet)
+        </button>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-3">
+        <label class="inline-flex items-center gap-2 text-xs font-medium text-slate-700 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 cursor-pointer">
+          <input id="chkAutoCalcBudget" type="checkbox" checked class="rounded text-blue-600 focus:ring-blue-500" />
+          <span>คำนวณงบอัตโนมัติเมื่อแก้จำนวนหน่วย</span>
+        </label>
+        <div class="flex items-center gap-2">
+          <label for="selectProvince" class="text-xs font-semibold text-slate-600">จังหวัด:</label>
+          <select id="selectProvince" class="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="all">ทุกจังหวัด (30 จังหวัด)</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4 KPI Summary Cards -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- Card 1: 240 mL -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 relative overflow-hidden">
+        <div class="absolute top-0 left-0 w-1.5 h-full bg-blue-800"></div>
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold uppercase tracking-wide text-blue-900 bg-blue-50 px-2.5 py-1 rounded-md">1. ขนาดขวด 240 mL</span>
+          <span id="kpi240Projects" class="text-xs font-semibold text-slate-500">68 โครงการ</span>
+        </div>
+        <div id="kpi240Qty" class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-3">34,179 ขวด</div>
+        <div class="mt-2 flex items-center justify-between text-xs text-slate-600">
+          <span>งบประมาณรวม: <strong id="kpi240Budget" class="text-slate-900">฿13,599,957.68</strong></span>
+          <span id="kpi240Share" class="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">58.3%</span>
+        </div>
+      </div>
+
+      <!-- Card 2: 60 mL -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 relative overflow-hidden">
+        <div class="absolute top-0 left-0 w-1.5 h-full bg-sky-500"></div>
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold uppercase tracking-wide text-sky-800 bg-sky-50 px-2.5 py-1 rounded-md">2. ขนาดขวด 60 mL</span>
+          <span id="kpi60Projects" class="text-xs font-semibold text-slate-500">12 โครงการ</span>
+        </div>
+        <div id="kpi60Qty" class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-3">4,340 ขวด</div>
+        <div class="mt-2 flex items-center justify-between text-xs text-slate-600">
+          <span>งบประมาณรวม: <strong id="kpi60Budget" class="text-slate-900">฿464,380.00</strong></span>
+          <span id="kpi60Share" class="font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded">2.0%</span>
+        </div>
+      </div>
+
+      <!-- Card 3: Sachet 5 mL -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 relative overflow-hidden">
+        <div class="absolute top-0 left-0 w-1.5 h-full bg-emerald-600"></div>
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold uppercase tracking-wide text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-md">3. แบบซอง 5 mL (Sachet)</span>
+          <span id="kpiSachetProjects" class="text-xs font-semibold text-slate-500">73 โครงการ</span>
+        </div>
+        <div id="kpiSachetQty" class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-3">527,200 ซอง</div>
+        <div class="mt-2 flex items-center justify-between text-xs text-slate-600">
+          <span id="kpiSachetBoxes">คิดเป็น 26,360 กล่อง • <strong id="kpiSachetBudget" class="text-slate-900">฿9,245,656.00</strong></span>
+          <span id="kpiSachetShare" class="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">39.7%</span>
+        </div>
+      </div>
+
+      <!-- Card 4: Grand Total -->
+      <div class="bg-gradient-to-br from-slate-900 to-blue-950 text-white rounded-2xl shadow-sm p-5 relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold uppercase tracking-wide text-teal-300 bg-white/10 px-2.5 py-1 rounded-md">งบประมาณรวม (เฉพาะระบุจำนวน)</span>
+          <span id="kpiTotalProjects" class="text-xs font-semibold text-slate-300">153 โครงการ</span>
+        </div>
+        <div id="kpiTotalBudget" class="text-2xl sm:text-3xl font-extrabold text-white mt-3">฿23,309,993.68</div>
+        <div class="mt-2 flex items-center justify-between text-xs text-slate-300">
+          <span>ราคากลางรวม: <strong id="kpiTotalMedian" class="text-white">฿23,312,403.28</strong></span>
+          <span id="kpiTotalHospitals" class="font-semibold text-teal-300">35 โรงพยาบาล</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3 Interactive Charts Grid -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      <!-- Chart 1: Donut Chart of Budget Share -->
+      <div class="lg:col-span-4 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col justify-between">
+        <div>
+          <h2 class="text-sm font-bold text-slate-800">สัดส่วนวงเงินงบประมาณ (3 รูปแบบที่มีจำนวนแน่นอน)</h2>
+          <p class="text-xs text-slate-500 mt-0.5">อัปเดตอัตโนมัติตามข้อมูลที่คุณแก้ไขหรือกรอง</p>
+        </div>
+        <div class="relative h-64 mt-3">
+          <canvas id="chartBudgetPie"></canvas>
+        </div>
+      </div>
+
+      <!-- Chart 2: Bar Chart of Quantities -->
+      <div class="lg:col-span-4 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col justify-between">
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <h2 class="text-sm font-bold text-slate-800">เปรียบเทียบปริมาณจัดซื้อจริง</h2>
+            <p class="text-xs text-slate-500 mt-0.5">ขวด 240 mL vs ขวด 60 mL vs แบบซอง 5 mL</p>
+          </div>
+          <select id="selectSachetUnitMode" class="text-xs border border-slate-300 rounded-lg px-2 py-1 bg-slate-50 text-slate-700">
+            <option value="box">แสดงซองเป็น: กล่อง (20 ซอง)</option>
+            <option value="sachet">แสดงซองเป็น: จำนวนซอง</option>
+          </select>
+        </div>
+        <div class="relative h-64 mt-3">
+          <canvas id="chartQtyBar"></canvas>
+        </div>
+      </div>
+
+      <!-- Chart 3: Top 10 Hospitals Horizontal Bar Chart -->
+      <div class="lg:col-span-4 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col justify-between">
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <h2 class="text-sm font-bold text-slate-800">10 อันดับโรงพยาบาลที่สั่งซื้อสูงสุด</h2>
+            <p class="text-xs text-slate-500 mt-0.5">เฉพาะโครงการที่ระบุจำนวนแน่นอน</p>
+          </div>
+          <select id="selectTopMetric" class="text-xs border border-slate-300 rounded-lg px-2 py-1 bg-slate-50 text-slate-700">
+            <option value="budget">เรียงตาม: งบประมาณ (บาท)</option>
+            <option value="projects">เรียงตาม: จำนวนโครงการ</option>
+          </select>
+        </div>
+        <div class="relative h-64 mt-3">
+          <canvas id="chartTopHospitals"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Summary Tables + Unit Price Quick Adjuster -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      <!-- Left: Summary by 3 Definite Packaging Forms + Benchmark Unit Price Editor -->
+      <div class="lg:col-span-6 bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <h2 class="text-sm font-bold text-slate-800">ตารางสรุป 3 รูปแบบบรรจุภัณฑ์ (ปรับราคาต่อหน่วยเพื่อจำลองงบได้)</h2>
+            <p class="text-xs text-slate-500">ปรับราคาอ้างอิงต่อหน่วยด้านล่างหากต้องการคำนวณงบประมาณใหม่ทั้งกลุ่ม</p>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-800 text-white">
+                <th class="py-2.5 px-3 rounded-tl-lg">รูปแบบบรรจุภัณฑ์</th>
+                <th class="py-2.5 px-2 text-center">โครงการ</th>
+                <th class="py-2.5 px-3 text-right">จำนวนรวมทั้งหมด</th>
+                <th class="py-2.5 px-2 text-right">ราคา/หน่วย (แก้ได้)</th>
+                <th class="py-2.5 px-3 text-right rounded-tr-lg">งบประมาณรวม (บาท)</th>
+              </tr>
+            </thead>
+            <tbody id="pkgSummaryBody" class="divide-y divide-slate-200"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Right: Top 10 Hospitals Summary Table -->
+      <div class="lg:col-span-6 bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <h2 class="text-sm font-bold text-slate-800">10 อันดับโรงพยาบาลที่มียอดจัดซื้อสูงสุด (เฉพาะระบุจำนวนแน่นอน)</h2>
+            <p class="text-xs text-slate-500">คำนวณสดจากตารางรายการสั่งซื้อด้านล่าง</p>
+          </div>
+        </div>
+        <div class="overflow-x-auto max-h-64">
+          <table class="w-full text-xs text-left border-collapse">
+            <thead class="sticky top-0 bg-slate-800 text-white">
+              <tr>
+                <th class="py-2 px-2.5 text-center rounded-tl-lg">#</th>
+                <th class="py-2 px-3">โรงพยาบาล (จังหวัด)</th>
+                <th class="py-2 px-2.5 text-center">จำนวนที่จัดซื้อรวม</th>
+                <th class="py-2 px-3 text-right">งบประมาณ (บาท)</th>
+                <th class="py-2 px-2.5 text-right rounded-tr-lg">สัดส่วน</th>
+              </tr>
+            </thead>
+            <tbody id="topHospTableBody" class="divide-y divide-slate-200"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Editable Project List Table (153 Definite-Quantity Projects) -->
+    <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+        <div>
+          <h2 class="text-base font-bold text-slate-900">
+            ตารางรายการสั่งซื้อ Sucralfate ที่ระบุจำนวนแน่นอน (<span id="tableCountBadge">153</span> โครงการ) — คลิกช่องตัวเลขเพื่อแก้ไขได้ทันที
+          </h2>
+          <p class="text-xs text-slate-500">
+            สามารถแก้ไข ชื่อโรงพยาบาล, รูปแบบบรรจุภัณฑ์, จำนวน (ขวด/ซอง), วงเงินงบประมาณ หรือราคากลาง ในตารางได้โดยตรง แล้วกราฟด้านบนจะเปลี่ยนตามทันที
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <input id="inputSearch" type="text" placeholder="ค้นหาโรงพยาบาล, จังหวัด, เลข e-GP..." class="w-full sm:w-64 text-xs border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+      </div>
+
+      <div class="overflow-x-auto max-h-[520px] border border-slate-200 rounded-xl">
+        <table class="w-full text-xs text-left border-collapse">
+          <thead class="sticky top-0 bg-slate-900 text-white z-10">
+            <tr>
+              <th class="py-2.5 px-2.5 text-center">ลำดับ</th>
+              <th class="py-2.5 px-3">หน่วยงาน / โรงพยาบาล (แก้ได้)</th>
+              <th class="py-2.5 px-2.5 text-center">จังหวัด</th>
+              <th class="py-2.5 px-2.5 text-center">เลข e-GP</th>
+              <th class="py-2.5 px-3">รูปแบบบรรจุภัณฑ์ (แก้ได้)</th>
+              <th class="py-2.5 px-3 text-right">จำนวนหน่วย (ขวด/ซอง)</th>
+              <th class="py-2.5 px-2.5 text-center">หน่วยนับ</th>
+              <th class="py-2.5 px-3 text-right">วงเงินงบประมาณ (บาท)</th>
+              <th class="py-2.5 px-3 text-right">ราคากลาง (บาท)</th>
+              <th class="py-2.5 px-2.5 text-center">จัดการ</th>
+            </tr>
+          </thead>
+          <tbody id="projectTableBody" class="divide-y divide-slate-200 bg-white"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Add New Project Modal -->
+  <div id="addModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+        <h3 class="text-base font-bold text-slate-900">เพิ่มรายการสั่งซื้อ Sucralfate ใหม่</h3>
+        <button id="btnCloseAddModal" type="button" class="text-slate-400 hover:text-slate-600 text-lg font-bold px-2">×</button>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+        <div class="sm:col-span-2">
+          <label class="font-semibold text-slate-700 block mb-1">ชื่อหน่วยงาน / โรงพยาบาล</label>
+          <input id="newHospital" type="text" value="โรงพยาบาลตัวอย่าง" class="w-full border border-slate-300 rounded-lg px-3 py-2" />
+        </div>
+        <div>
+          <label class="font-semibold text-slate-700 block mb-1">จังหวัด</label>
+          <input id="newProvince" type="text" value="กรุงเทพมหานคร" class="w-full border border-slate-300 rounded-lg px-3 py-2" />
+        </div>
+        <div>
+          <label class="font-semibold text-slate-700 block mb-1">เลขที่โครงการ (e-GP)</label>
+          <input id="newEgpId" type="text" value="69099999999" class="w-full border border-slate-300 rounded-lg px-3 py-2" />
+        </div>
+        <div>
+          <label class="font-semibold text-slate-700 block mb-1">รูปแบบบรรจุภัณฑ์</label>
+          <select id="newCategory" class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white">
+            <option value="240mL">1. ขนาดขวด 240 mL (393.76 บ./ขวด)</option>
+            <option value="60mL">2. ขนาดขวด 60 mL (107.00 บ./ขวด)</option>
+            <option value="sachet">3. แบบซอง 5 mL (14.98 บ./ซอง)</option>
+          </select>
+        </div>
+        <div>
+          <label class="font-semibold text-slate-700 block mb-1">จำนวนหน่วย (ขวด หรือ ซอง)</label>
+          <input id="newQty" type="number" min="1" value="500" class="w-full border border-slate-300 rounded-lg px-3 py-2" />
+        </div>
+        <div>
+          <label class="font-semibold text-slate-700 block mb-1">วงเงินงบประมาณ (บาท)</label>
+          <input id="newBudget" type="number" step="0.01" value="196880.00" class="w-full border border-slate-300 rounded-lg px-3 py-2" />
+        </div>
+        <div>
+          <label class="font-semibold text-slate-700 block mb-1">ราคากลาง (บาท)</label>
+          <input id="newMedian" type="number" step="0.01" value="196880.00" class="w-full border border-slate-300 rounded-lg px-3 py-2" />
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
+        <button id="btnCancelAddModal" type="button" class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">ยกเลิก</button>
+        <button id="btnConfirmAddProject" type="button" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow">บันทึกรายการ</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const INITIAL_RECORDS = [{"id": 1, "origRank": 1, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลพระนครศรีอยุธยา", "province": "พระนครศรีอยุธยา", "egpId": "69099392702", "projectTitle": "ซื้อ SUCRALFATE SUSP 240 ML จำนวน 50 BOT โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 50, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 118513.2, "medianPrice": 131326.0, "winnerDate": "25/09/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 2, "origRank": 2, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลนครปฐม", "province": "นครปฐม", "egpId": "69069087471", "projectTitle": "ประกวดราคาซื้อยา Sucralfate 1 g 5 mL oral suspension, 240 mL จำนวน 5,928 bottle ด้วยวิธีประกวดราคาอิเล็กทรอนิกส์ (e-bidding)", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 5928, "unitName": "ขวด (240 mL)", "announceDate": "27/08/2569", "budget": 2334209.28, "medianPrice": 2334209.28, "winnerDate": "29/09/2569", "status": "อนุมัติสั่งซื้อสั่งจ้างและประกาศผู้ชนะการเสนอราคา"}, {"id": 3, "origRank": 4, "hospital": "โรงพยาบาลตะกั่วป่า", "province": "พังงา", "egpId": "69099507597", "projectTitle": "ซื้อยาในบัญชียาหลักแห่งชาติ Sucralfate 1 g/5 mL oral suspension, 240 mL bottle  จำนวน 130 ขวด โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 130, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 51188.8, "medianPrice": 51188.8, "winnerDate": "16/09/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 4, "origRank": 6, "hospital": "โรงพยาบาลอุดรธานี", "province": "อุดรธานี", "egpId": "69099602396", "projectTitle": "ซื้อ SUCRALFATE SUSPENSION 1G/5ML (240ML) โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 100, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 82176.0, "medianPrice": 82176.0, "winnerDate": "18/09/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 5, "origRank": 10, "hospital": "โรงพยาบาลราชบุรี", "province": "ราชบุรี", "egpId": "69069486951", "projectTitle": "ประกวดราคาซื้อยา SUCRALFATE ORAL SUSP ๑,๐๐๐ MG./๕ ML. (๕ ML.) จำนวน ๘๔,๐๐๐ SACHET ด้วยวิธีประกวดราคาอิเล็กทรอนิกส์ (e-bidding)", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 84000, "unitName": "ซอง (5 mL)", "announceDate": "02/07/2569", "budget": 2606520.0, "medianPrice": 2606520.0, "winnerDate": "13/08/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 6, "origRank": 11, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลนครปฐม", "province": "นครปฐม", "egpId": "69099600426", "projectTitle": "ซื้อยา SUCRALFATE SUSPENSION 1 G/5 ML, 240 ML โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 1260, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 496137.6, "medianPrice": 496137.6, "winnerDate": "15/09/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 7, "origRank": 12, "hospital": "โรงพยาบาลลำปาง", "province": "ลำปาง", "egpId": "69099032046", "projectTitle": "ซื้อยา sucralfate 1 g/5 mL oral suspension 240 mL 40 bottle (208860). โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 40, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 15750.4, "medianPrice": 15750.4, "winnerDate": "03/09/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 8, "origRank": 14, "hospital": "โรงพยาบาลปัตตานี", "province": "ปัตตานี", "egpId": "69099432273", "projectTitle": "ซื้อยา Sucralfate 1g/5ml Oral suspension (GPU-810205) โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 8000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 119840.0, "medianPrice": 119840.0, "winnerDate": "02/09/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 9, "origRank": 15, "hospital": "โรงพยาบาลสมุทรปราการ", "province": "สมุทรปราการ", "egpId": "69099115165", "projectTitle": "ซื้อsucralfate 1 g/5 mL oral suspension, 240 mL bottle โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 100, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 39376.0, "medianPrice": 29376.0, "winnerDate": "08/09/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 10, "origRank": 18, "hospital": "โรงพยาบาลสิงห์บุรี", "province": "สิงห์บุรี", "egpId": "69089681792", "projectTitle": "ซื้อSucralfate 1 g/5 ml suspension 240 ml bot โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 200, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 78752.0, "medianPrice": 78752.0, "winnerDate": "28/08/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 11, "origRank": 21, "hospital": "โรงพยาบาลมหาสารคาม", "province": "มหาสารคาม", "egpId": "69099066494", "projectTitle": "ซื้อยา Sucralfate 1 g/5 ml susp., 240 ml โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 100, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 39376.0, "medianPrice": 39376.0, "winnerDate": "21/08/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 12, "origRank": 22, "hospital": "โรงพยาบาลสมเด็จพระปิ่นเกล้า", "province": "กรุงเทพมหานคร", "egpId": "69099104048", "projectTitle": "ซื้อSucralfate (Ulcefate) Susp 1 g/5 ml, 240 ml , 1s , 60BOT , ย6489/69 โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 60, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 23625.6, "medianPrice": 23625.6, "winnerDate": "24/08/2569", "status": "อนุมัติสั่งซื้อสั่งจ้างและประกาศผู้ชนะการเสนอราคา"}, {"id": 13, "origRank": 28, "hospital": "สถาบันบำราศนราดูร", "province": "นนทบุรี", "egpId": "69079493273", "projectTitle": "ซื้อยา Sucralfate ๑ g/๕ ml oral suspension ขนาดบรรจุ ๒๔๐ มิลลิลิตร โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 500, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 196880.0, "medianPrice": 196880.0, "winnerDate": "17/08/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 14, "origRank": 29, "hospital": "โรงพยาบาลราชบุรี", "province": "ราชบุรี", "egpId": "69089620051", "projectTitle": "ซื้อยา SUCRALFATE ORAL SUSP 1 GM/5 ML, 5 ML. (20SACH/BOX) (PPB69-0172) โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 20000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 299600.0, "medianPrice": 299600.0, "winnerDate": "20/08/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 15, "origRank": 31, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลสุรินทร์", "province": "สุรินทร์", "egpId": "69099327547", "projectTitle": "ซื้อsucralfate 1 g/5 ml oral suspension 60 ml โดยวิธีเฉพาะเจาะจง", "category": "60mL", "categoryLabel": "2. ขนาดขวด 60 mL (Oral Suspension 60 mL)", "qty": 300, "unitName": "ขวด (60 mL)", "announceDate": "-", "budget": 32100.0, "medianPrice": 32100.0, "winnerDate": "19/08/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 16, "origRank": 32, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลหาดใหญ่", "province": "สงขลา", "egpId": "69099144507", "projectTitle": "ซื้อSUCRALFATE 1 GM/5 ML SUSP. 240 ML (ULCEFATE ) จำนวน 40 x 1 BOT มูลค่า 15,750.40 บาท (ใบสั่งซื้อเลขที่  6907429) โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 40, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 15750.4, "medianPrice": 15750.4, "winnerDate": "18/08/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 17, "origRank": 34, "hospital": "โรงพยาบาลพุทธชินราช", "province": "พิษณุโลก", "egpId": "69089659550", "projectTitle": "ซื้อเวชภัณฑ์ยา Sucralfate suspension 1 g/5 ml โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 8000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 119840.0, "medianPrice": 119840.0, "winnerDate": "18/08/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 18, "origRank": 38, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลสุราษฎร์ธานี", "province": "สุราษฎร์ธานี", "egpId": "69099172623", "projectTitle": "ซื้อยา sucralfate 1 g/5 mL oral suspension, 5 mL sachet โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 89880.0, "medianPrice": 89880.0, "winnerDate": "13/08/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 19, "origRank": 44, "hospital": "โรงพยาบาลสมเด็จพระเจ้าตากสินมหาราช", "province": "ตาก", "egpId": "69089385735", "projectTitle": "ซื้อSUCRALFATE GEL 1 GM. 5 ML. โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 89880.0, "medianPrice": 89880.0, "winnerDate": "05/08/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 20, "origRank": 49, "hospital": "โรงพยาบาลสมเด็จพระปิ่นเกล้า", "province": "กรุงเทพมหานคร", "egpId": "69099034734", "projectTitle": "ซื้อSucralfate (Ulcefate) Susp 1 g/5 ml, 240 ml , 1s , 30 BOT , ย6374/69 โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 30, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 11812.8, "medianPrice": 11812.8, "winnerDate": "31/07/2569", "status": "อนุมัติสั่งซื้อสั่งจ้างและประกาศผู้ชนะการเสนอราคา"}, {"id": 21, "origRank": 50, "hospital": "โรงพยาบาลราชบุรี", "province": "ราชบุรี", "egpId": "69089125111", "projectTitle": "ซื้อยา SUCRALFATE ORAL SUSP 1 GM/5 ML, 5 ML. (20SACH/BOX) (PPB69-0160) โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 16000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 239680.0, "medianPrice": 239680.0, "winnerDate": "31/07/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 22, "origRank": 59, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลนครพิงค์", "province": "เชียงใหม่", "egpId": "69099155952", "projectTitle": "ซื้อSUCRALFATE 1 GM/5ML SUSPENSION IN 60 ML  โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 3000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 44940.0, "medianPrice": 44940.0, "winnerDate": "17/07/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 23, "origRank": 65, "hospital": "โรงพยาบาลพุทธชินราช", "province": "พิษณุโลก", "egpId": "69079581413", "projectTitle": "ซื้อเวชภัณฑ์ยา Sucralfate Suspension 1 g/ 5 ml โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 89880.0, "medianPrice": 89880.0, "winnerDate": "16/07/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 24, "origRank": 66, "hospital": "โรงพยาบาลปัตตานี", "province": "ปัตตานี", "egpId": "69089457096", "projectTitle": "ซื้อยา Sucralfate 1g/5ml Oral suspension  (GPU-810205) โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 8000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 119840.0, "medianPrice": 119840.0, "winnerDate": "08/07/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 25, "origRank": 67, "hospital": "โรงพยาบาลพัทลุง", "province": "พัทลุง", "egpId": "69099708357", "projectTitle": "ซื้อSUCRALFATE SUSP. 1 G/5 ML., 240 ML. โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 50, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 19688.0, "medianPrice": 19688.0, "winnerDate": "09/07/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 26, "origRank": 68, "hospital": "โรงพยาบาลสมเด็จพระนางเจ้าสิริกิติ์", "province": "ชลบุรี", "egpId": "69079133059", "projectTitle": "ซื้อSucralfate 1 G / 5 ML. x 240 ML. SUSP. ขนาดบรรจุ 1 BOTT  จำนวน 540 BOTT โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 540, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 212630.4, "medianPrice": 212630.4, "winnerDate": "07/07/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 27, "origRank": 70, "hospital": "โรงพยาบาลร้อยเอ็ด", "province": "ร้อยเอ็ด", "egpId": "69089463835", "projectTitle": "ซื้อ  sucralfate 1 g/5 mL oral suspension, 240 mL bottle โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 1200, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 472512.0, "medianPrice": 472512.0, "winnerDate": "13/07/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 28, "origRank": 76, "hospital": "โรงพยาบาลมหาวชิราลงกรณธัญบุรี", "province": "ปทุมธานี", "egpId": "69079130683", "projectTitle": "ซื้อเวชภัณฑ์ยา Sucralfate oral suspension 1,000 mg/5 ml (5 ml) จำนวน 100 กล่อง ประจำปีงบประมาณ พ.ศ.2569 โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 2000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 29960.0, "medianPrice": 29960.0, "winnerDate": "09/07/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 29, "origRank": 77, "hospital": "โรงพยาบาลสมเด็จพระปิ่นเกล้า", "province": "กรุงเทพมหานคร", "egpId": "69089342109", "projectTitle": "ซื้อSucralfate (Ulcefate) Susp 1g/5ml , 240ml , 1s , 70BOT , ย5647/69 โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 70, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 27563.2, "medianPrice": 27563.2, "winnerDate": "08/07/2569", "status": "อนุมัติสั่งซื้อสั่งจ้างและประกาศผู้ชนะการเสนอราคา"}, {"id": 30, "origRank": 78, "hospital": "โรงพยาบาลพระปกเกล้า", "province": "จันทบุรี", "egpId": "69079182097", "projectTitle": "ซื้อSucralfate ๑gm/๕ml oral suspension ๕ml ๒๐ ซอง   จำนวน  ๑๐๐  กล่อง โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 2000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 29960.0, "medianPrice": 29960.0, "winnerDate": "07/07/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 31, "origRank": 82, "hospital": "โรงพยาบาลลำปาง", "province": "ลำปาง", "egpId": "69069393621", "projectTitle": "ซื้อยา sucralfate 1 g/5 mL oral suspension 240 mL 100 bottle (208860). โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 100, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 39376.0, "medianPrice": 39376.0, "winnerDate": "19/06/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 32, "origRank": 83, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลสุราษฎร์ธานี", "province": "สุราษฎร์ธานี", "egpId": "69089075127", "projectTitle": "ซื้อยา sucralfate 1 g/5 mL oral suspension, 5 mL sachet โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 10000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 149800.0, "medianPrice": 149800.0, "winnerDate": "29/06/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 33, "origRank": 86, "hospital": "โรงพยาบาลสมเด็จพระเจ้าตากสินมหาราช", "province": "ตาก", "egpId": "69079072448", "projectTitle": "ซื้อSUCRALFATE GEL 1 GM. 5 ML. โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 89880.0, "medianPrice": 89880.0, "winnerDate": "26/06/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 34, "origRank": 92, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลนครพิงค์", "province": "เชียงใหม่", "egpId": "69089306076", "projectTitle": "ซื้อSUCRALFATE 1 GM/5ML SUSPENSION IN 60 ML  โดยวิธีเฉพาะเจาะจง", "category": "60mL", "categoryLabel": "2. ขนาดขวด 60 mL (Oral Suspension 60 mL)", "qty": 500, "unitName": "ขวด (60 mL)", "announceDate": "-", "budget": 53500.0, "medianPrice": 53500.0, "winnerDate": "18/06/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 35, "origRank": 100, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลหาดใหญ่", "province": "สงขลา", "egpId": "69079328257", "projectTitle": "ซื้อSUCRALFATE 1 GM/5 ML SUSP. 240 ML (ULCEFATE ) จำนวน 40 x 1 BOT มูลค่า 15,750.40 บาท (ใบสั่งซื้อเลขที่  6906110) โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 40, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 15750.4, "medianPrice": 15750.4, "winnerDate": "12/06/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 36, "origRank": 101, "hospital": "โรงพยาบาลตะกั่วป่า", "province": "พังงา", "egpId": "69069269957", "projectTitle": "ซื้อยาในบัญชียาหลักแห่งชาติ Sucralfate 1 g/5 mL oral suspension, 240 mL bottle จำนวน 100 ขวด โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 100, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 39376.0, "medianPrice": 39376.0, "winnerDate": "11/06/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 37, "origRank": 105, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลนครปฐม", "province": "นครปฐม", "egpId": "69069120363", "projectTitle": "ซื้อยา SUCRALFATE SUSPENSION 1 G/5 ML, 240 ML โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 1260, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 496137.6, "medianPrice": 496137.6, "winnerDate": "05/06/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 38, "origRank": 106, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลนครพิงค์", "province": "เชียงใหม่", "egpId": "69079508941", "projectTitle": "ซื้อSUCRALFATE 1 GM/5ML SUSPENSION IN 60 ML  โดยวิธีเฉพาะเจาะจง", "category": "60mL", "categoryLabel": "2. ขนาดขวด 60 mL (Oral Suspension 60 mL)", "qty": 360, "unitName": "ขวด (60 mL)", "announceDate": "-", "budget": 38520.0, "medianPrice": 38520.0, "winnerDate": "04/06/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 39, "origRank": 107, "hospital": "โรงพยาบาลราชบุรี", "province": "ราชบุรี", "egpId": "69069282736", "projectTitle": "ซื้อยา SUCRALFATE ORAL SUSP 1 GM/5 ML, 5 ML. (20SACH/BOX) (PPB69-0113) โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 16000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 239680.0, "medianPrice": 239680.0, "winnerDate": "04/06/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 40, "origRank": 110, "hospital": "โรงพยาบาลร้อยเอ็ด", "province": "ร้อยเอ็ด", "egpId": "69069283075", "projectTitle": "ซื้อ sucralfate 1 g/5 mL oral suspension, 240 mL bottle โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 1000, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 393760.0, "medianPrice": 393760.0, "winnerDate": "28/05/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 41, "origRank": 115, "hospital": "โรงพยาบาลสมเด็จพระนางเจ้าสิริกิติ์", "province": "ชลบุรี", "egpId": "69059174147", "projectTitle": "ซื้อSucralfate 1 G / 5 ML. x 240 ML. SUSP. ขนาดบรรจุ 1 BOTT  จำนวน 480 BOTT โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 480, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 189004.8, "medianPrice": 189004.8, "winnerDate": "12/05/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 42, "origRank": 119, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลสุราษฎร์ธานี", "province": "สุราษฎร์ธานี", "egpId": "69079058211", "projectTitle": "ซื้อยา sucralfate 1 g/5 mL oral suspension, 5 mL sachet โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 10000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 149800.0, "medianPrice": 149800.0, "winnerDate": "20/05/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 43, "origRank": 120, "hospital": "โรงพยาบาลสมเด็จพระปิ่นเกล้า", "province": "กรุงเทพมหานคร", "egpId": "69069240718", "projectTitle": "ซื้อSucralfate (Ulcefate) Susp 1 g/5 ml, 240 ml , 1s , 100 bot , ย4814/69 โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 100, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 39376.0, "medianPrice": 39376.0, "winnerDate": "20/05/2569", "status": "อนุมัติสั่งซื้อสั่งจ้างและประกาศผู้ชนะการเสนอราคา"}, {"id": 44, "origRank": 123, "hospital": "โรงพยาบาลพระปกเกล้า", "province": "จันทบุรี", "egpId": "69059339574", "projectTitle": "ซื้อSucralfate ๑gm/๕ml oral suspension ๕ml ๒๐ ซอง  จำนวน  ๑๐๐  กล่อง โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 2000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 29960.0, "medianPrice": 29960.0, "winnerDate": "19/05/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 45, "origRank": 125, "hospital": "โรงพยาบาลอุดรธานี", "province": "อุดรธานี", "egpId": "69059338829", "projectTitle": "ซื้อSUCRALFATE SUSPENSION 1G/5ML (240ML) โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 50, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 19688.0, "medianPrice": 19688.0, "winnerDate": "19/05/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 46, "origRank": 128, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลนครปฐม", "province": "นครปฐม", "egpId": "69059406537", "projectTitle": "ซื้อยา SUCRALFATE SUSPENSION 1 G/5 ML, 240 ML โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 1260, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 496137.6, "medianPrice": 496137.6, "winnerDate": "15/05/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 47, "origRank": 130, "hospital": "โรงพยาบาลปัตตานี", "province": "ปัตตานี", "egpId": "69069514165", "projectTitle": "ซื้อยา Sucralfate 1g/5ml Oral suspension (GPU-810205) โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 8000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 119840.0, "medianPrice": 119840.0, "winnerDate": "06/05/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 48, "origRank": 135, "hospital": "โรงพยาบาลพุทธชินราช", "province": "พิษณุโลก", "egpId": "69059243586", "projectTitle": "ซื้อเวชภัณฑ์ยา Sucralfate suspension 1 g/5 ml โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 10000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 149800.0, "medianPrice": 149800.0, "winnerDate": "11/05/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 49, "origRank": 136, "hospital": "สถาบันบำราศนราดูร", "province": "นนทบุรี", "egpId": "69059131292", "projectTitle": "ซื้อยา Sucralfate ๑ g/๕ ml oral suspension ขนาดบรรจุ ๒๔๐ มิลลิลิตร โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 500, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 196880.0, "medianPrice": 196880.0, "winnerDate": "11/05/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 50, "origRank": 137, "hospital": "คณะแพทยศาสตร์", "province": "พิษณุโลก", "egpId": "69059065508", "projectTitle": "ซื้อเวชภัณฑ์ยา Sucralfate ๑ g gel (๕ ml) จำนวน ๒๘๐ กล่อง ของคณะแพทยศาสตร์ โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 5600, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 83888.0, "medianPrice": 83888.0, "winnerDate": "07/05/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 51, "origRank": 140, "hospital": "โรงพยาบาลกาฬสินธุ์", "province": "กาฬสินธุ์", "egpId": "69059271994", "projectTitle": "ซื้อSUCRALFATE 1 GM/5 ML 240 ML โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 150, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 59064.0, "medianPrice": 59064.0, "winnerDate": "06/05/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 52, "origRank": 142, "hospital": "โรงพยาบาลขอนแก่น", "province": "ขอนแก่น", "egpId": "69089246011", "projectTitle": "ซื้อเวชภัณฑ์ยา จำนวน 1 รายการ  (SUCRALFATE GEL 1GM. 5ML.) โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 2000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 29960.0, "medianPrice": 29960.0, "winnerDate": "30/04/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 53, "origRank": 148, "hospital": "คณะแพทยศาสตร์", "province": "ชลบุรี", "egpId": "69049190702", "projectTitle": "ซื้อยา Sucralfate 1 gm/5 ml suspention 240 ml จำนวน 400 ขวด โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 400, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 157504.0, "medianPrice": 157504.0, "winnerDate": "23/04/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 54, "origRank": 149, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลสุรินทร์", "province": "สุรินทร์", "egpId": "69069408130", "projectTitle": "ซื้อsucralfate 1 g/5 ml oral suspension, 60 ml โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 5000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 74900.0, "medianPrice": 74900.0, "winnerDate": "27/04/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 55, "origRank": 152, "hospital": "โรงพยาบาลราชบุรี", "province": "ราชบุรี", "egpId": "69059343693", "projectTitle": "ซื้อยา SUCRALFATE ORAL SUSP 1 GM/5 ML, 5 ML.(20SACH/BOX) (PP69-1076) โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6600, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 98868.0, "medianPrice": 98868.0, "winnerDate": "24/04/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 56, "origRank": 156, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลนครปฐม", "province": "นครปฐม", "egpId": "69059037501", "projectTitle": "ซื้อยา SUCRALFATE SUSPENSION 1 G/5 ML, 240 ML โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 1260, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 496137.6, "medianPrice": 496137.6, "winnerDate": "20/04/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 57, "origRank": 159, "hospital": "โรงพยาบาลตะกั่วป่า", "province": "พังงา", "egpId": "69049324597", "projectTitle": "ซื้อยาในบัญชียาหลักแห่งชาติ Sucralfate 1 g/5 mL oral suspension, 240 mL bottle  จำนวน 70 ขวด  โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 70, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 27563.2, "medianPrice": 27563.2, "winnerDate": "16/04/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 58, "origRank": 161, "hospital": "โรงพยาบาลราชบุรี", "province": "ราชบุรี", "egpId": "69049352338", "projectTitle": "ซื้อยา SUCRALFATE ORAL SUSP 1 GM/5 ML, 5 ML.(20SACH/BOX) (PP69-1021) โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6600, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 98868.0, "medianPrice": 98868.0, "winnerDate": "16/04/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 59, "origRank": 162, "hospital": "โรงพยาบาลสมุทรปราการ", "province": "สมุทรปราการ", "egpId": "69049144717", "projectTitle": "ซื้อsucralfate 1 g/5 mL oral suspension, 240 mL bot โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 250, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 98440.0, "medianPrice": 98440.0, "winnerDate": "10/04/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 60, "origRank": 165, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลสุราษฎร์ธานี", "province": "สุราษฎร์ธานี", "egpId": "69069031876", "projectTitle": "ซื้อยา sucralfate 1 g/5 mL oral suspension, 5 mL sachet โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 10000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 149800.0, "medianPrice": 149800.0, "winnerDate": "07/04/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 61, "origRank": 170, "hospital": "โรงพยาบาลลำปาง", "province": "ลำปาง", "egpId": "69039395946", "projectTitle": "ซื้อยา  sucralfate 1 g/5 mL oral suspension 240 mL 80 bottle (208860). โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 80, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 31500.8, "medianPrice": 31500.8, "winnerDate": "25/03/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 62, "origRank": 171, "hospital": "โรงพยาบาลพระปกเกล้า", "province": "จันทบุรี", "egpId": "69049090153", "projectTitle": "ซื้อSucralfate ๑gm/๕ml oral suspension ๕ml ๒๐ ซอง  จำนวน  ๑๐๐  กล่อง โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 2000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 29960.0, "medianPrice": 29960.0, "winnerDate": "31/03/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 63, "origRank": 173, "hospital": "โรงพยาบาลร้อยเอ็ด", "province": "ร้อยเอ็ด", "egpId": "69049330798", "projectTitle": "ซื้อ sucralfate 1 g/5 mL oral suspension, 240 mL bottle โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 1000, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 393760.0, "medianPrice": 393760.0, "winnerDate": "30/03/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 64, "origRank": 176, "hospital": "โรงพยาบาลสมเด็จพระเจ้าตากสินมหาราช", "province": "ตาก", "egpId": "69049014279", "projectTitle": "ซื้อSUCRALFATE GEL 1 GM. 5 ML. โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 4000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 59920.0, "medianPrice": 59920.0, "winnerDate": "27/03/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 65, "origRank": 177, "hospital": "โรงพยาบาลสมเด็จพระปิ่นเกล้า", "province": "กรุงเทพมหานคร", "egpId": "69049370051", "projectTitle": "ซื้อSucralfate (ulcefate) susp 1 g/5 ml, 240 ml, 1s  120 bot,ย4040/69 โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 120, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 47251.2, "medianPrice": 47251.2, "winnerDate": "26/03/2569", "status": "อนุมัติสั่งซื้อสั่งจ้างและประกาศผู้ชนะการเสนอราคา"}, {"id": 66, "origRank": 178, "hospital": "โรงพยาบาลราชบุรี", "province": "ราชบุรี", "egpId": "69049025607", "projectTitle": "ซื้อยา SUCRALFATE ORAL SUSP 1 GM/5 ML, 5 ML. (20SACH/BOX) (PP69-0925) โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6600, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 98868.0, "medianPrice": 98868.0, "winnerDate": "26/03/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 67, "origRank": 180, "hospital": "โรงพยาบาลพุทธชินราช", "province": "พิษณุโลก", "egpId": "69049060024", "projectTitle": "ซื้อเวชภัณฑ์ยา Sucralfate suspension 1 g/5 ml โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 89880.0, "medianPrice": 89880.0, "winnerDate": "24/03/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 68, "origRank": 181, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลนครพิงค์", "province": "เชียงใหม่", "egpId": "69059128863", "projectTitle": "ซื้อSUCRALFATE 1 GM/5ML SUSPENSION IN 60 ML โดยวิธีเฉพาะเจาะจง", "category": "60mL", "categoryLabel": "2. ขนาดขวด 60 mL (Oral Suspension 60 mL)", "qty": 360, "unitName": "ขวด (60 mL)", "announceDate": "-", "budget": 38520.0, "medianPrice": 38520.0, "winnerDate": "20/03/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 69, "origRank": 183, "hospital": "โรงพยาบาลสมเด็จพระยุพราชเวียงสระ", "province": "สุราษฎร์ธานี", "egpId": "69039396608", "projectTitle": "ซื้อยาSucralfate 1 g/5 mL oral suspension โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 2000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 29960.0, "medianPrice": 29960.0, "winnerDate": "18/03/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 70, "origRank": 185, "hospital": "โรงพยาบาลสมเด็จพระนางเจ้าสิริกิติ์", "province": "ชลบุรี", "egpId": "69039223318", "projectTitle": "ซื้อSucralfate 1 G / 5 ML. x 240 ML. SUSP. ขนาดบรรจุ 1   BOTT  จำนวน 300 BOTT โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 300, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 118128.0, "medianPrice": 118128.0, "winnerDate": "13/03/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 71, "origRank": 191, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลนครปฐม", "province": "นครปฐม", "egpId": "69039401931", "projectTitle": "ซื้อยา SUCRALFATE 1 G/5 ML SUSPENSION, 240 ML  โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 1260, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 496137.6, "medianPrice": 496137.6, "winnerDate": "13/03/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 72, "origRank": 192, "hospital": "โรงพยาบาลราชบุรี", "province": "ราชบุรี", "egpId": "69039475423", "projectTitle": "ซื้อยา SUCRALFATE ORAL SUSP 1 GM/5 ML, 5 ML. (20SACH/BOX) (PP69-0814) โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6600, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 98868.0, "medianPrice": 98868.0, "winnerDate": "13/03/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 73, "origRank": 194, "hospital": "โรงพยาบาลปัตตานี", "province": "ปัตตานี", "egpId": "69049351943", "projectTitle": "ซื้อยา Sucralfate 1g/5ml Oral suspension (GPU-810205) โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 8000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 119840.0, "medianPrice": 119840.0, "winnerDate": "04/03/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 74, "origRank": 196, "hospital": "สถาบันบำราศนราดูร", "province": "นนทบุรี", "egpId": "69039122019", "projectTitle": "ซื้อยา Sucralfate 1 g/5 ml oral suspension ขนาดบรรจุ 240 มิลลิลิตร โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 500, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 196880.0, "medianPrice": 196880.0, "winnerDate": "09/03/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 75, "origRank": 200, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลสุราษฎร์ธานี", "province": "สุราษฎร์ธานี", "egpId": "69049190259", "projectTitle": "ซื้อยา sucralfate 1 g/5 mL oral suspension, 5 mL sachet โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 8000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 119840.0, "medianPrice": 119840.0, "winnerDate": "04/03/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 76, "origRank": 205, "hospital": "โรงพยาบาลสวรรค์ประชารักษ์", "province": "นครสวรรค์", "egpId": "69039077474", "projectTitle": "ซื้อsucralfate 1 g/5 mL, 240 mL โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 80, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 31500.8, "medianPrice": 31500.8, "winnerDate": "27/02/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 77, "origRank": 207, "hospital": "โรงพยาบาลพุทธชินราช", "province": "พิษณุโลก", "egpId": "69039144243", "projectTitle": "ซื้อเวชภัณฑ์ยา Sucralfate suspension 1 g/5 ml โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 89880.0, "medianPrice": 89880.0, "winnerDate": "26/02/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 78, "origRank": 208, "hospital": "หน่วยงานจัดซื้อยาและเวชภัณฑ์ทางการแพทย์ โรงพยาบาลศิริราช ปิยมหาราชการุณย์", "province": "กรุงเทพมหานคร", "egpId": "68119058439", "projectTitle": "ซื้อยา Ulcefate susp 1 g/5ml 240 ml(Sucralfate) โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 3431, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 1351000.0, "medianPrice": 1350596.8, "winnerDate": "21/11/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 79, "origRank": 209, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลนครพิงค์", "province": "เชียงใหม่", "egpId": "69049225807", "projectTitle": "ซื้อSUCRALFATE 1 GM/5ML SUSPENSION IN 60 ML  โดยวิธีเฉพาะเจาะจง", "category": "60mL", "categoryLabel": "2. ขนาดขวด 60 mL (Oral Suspension 60 mL)", "qty": 300, "unitName": "ขวด (60 mL)", "announceDate": "-", "budget": 32100.0, "medianPrice": 32100.0, "winnerDate": "25/02/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 80, "origRank": 211, "hospital": "โรงพยาบาลเชียงรายประชานุเคราะห์", "province": "เชียงราย", "egpId": "69039065063", "projectTitle": "ซื้อSucralfate 1 g/5 mL oral suspension 5 mL -sachet โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 1000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 14980.0, "medianPrice": 14980.0, "winnerDate": "25/02/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 81, "origRank": 216, "hospital": "โรงพยาบาลสมเด็จพระเจ้าตากสินมหาราช", "province": "ตาก", "egpId": "69029508623", "projectTitle": "ซื้อSUCRALFATE GEL 1 GM. 5 ML. โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 4000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 59920.0, "medianPrice": 59920.0, "winnerDate": "19/02/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 82, "origRank": 220, "hospital": "โรงพยาบาลเจ้าพระยายมราช", "province": "สุพรรณบุรี", "egpId": "69029251101", "projectTitle": "ซื้อ69-Rx10982 Sucralfate suspension 1 g/5 ml, 60 ml โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 10000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 149800.0, "medianPrice": 149800.0, "winnerDate": "09/02/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 83, "origRank": 222, "hospital": "โรงพยาบาลราชบุรี", "province": "ราชบุรี", "egpId": "69029296823", "projectTitle": "ซื้อยา SUCRALFATE ORAL SUSP 1 GM/5 ML, 5 ML. (20SACH/BOX) (PP69-0699) โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6600, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 98868.0, "medianPrice": 98868.0, "winnerDate": "09/02/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 84, "origRank": 223, "hospital": "โรงพยาบาลสมเด็จพระนางเจ้าสิริกิติ์", "province": "ชลบุรี", "egpId": "68109130986", "projectTitle": "ซื้อSucralfate 1 G / 5 ML. x 240 ML. SUSP. ขนาดบรรจุ 1 BOTT. จำนวน 400 BOTT โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 400, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 157504.0, "medianPrice": 157504.0, "winnerDate": "07/10/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 85, "origRank": 224, "hospital": "โรงพยาบาลตะกั่วป่า", "province": "พังงา", "egpId": "69029215536", "projectTitle": "ซื้อยาในบัญชียาหลักแห่งชาติ Sucralfate 1 g/5 mL oral suspension, 240 mL bottle  จำนวน 60 ขวด  โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 60, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 23625.6, "medianPrice": 23625.6, "winnerDate": "05/02/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 86, "origRank": 225, "hospital": "โรงพยาบาลสมเด็จพระปิ่นเกล้า", "province": "กรุงเทพมหานคร", "egpId": "69039219167", "projectTitle": "ซื้อSucralfate (Ulcefate) Susp 1 g/5 ml, 240 ml , 1s , 70BOT , ย2833/69 โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 70, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 27563.2, "medianPrice": 27563.2, "winnerDate": "05/02/2569", "status": "อนุมัติสั่งซื้อสั่งจ้างและประกาศผู้ชนะการเสนอราคา"}, {"id": 87, "origRank": 227, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลนครปฐม", "province": "นครปฐม", "egpId": "69039100482", "projectTitle": "ซื้อยา SUCRALFATE 1 G/5 ML SUSPENSION, 240 ML  โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 1260, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 496137.6, "medianPrice": 496137.6, "winnerDate": "04/02/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 88, "origRank": 230, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลสุราษฎร์ธานี", "province": "สุราษฎร์ธานี", "egpId": "69039461255", "projectTitle": "ซื้อยา sucralfate 1 g/5 mL oral suspension, 5 mL sachet โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 8000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 119840.0, "medianPrice": 119840.0, "winnerDate": "02/02/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 89, "origRank": 231, "hospital": "โรงพยาบาลพุทธชินราช", "province": "พิษณุโลก", "egpId": "69029117938", "projectTitle": "ซื้อเวชภัณฑ์ยา Sucralfate suspension 1 g/5 ml โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 8000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 119840.0, "medianPrice": 119840.0, "winnerDate": "02/02/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 90, "origRank": 238, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลบุรีรัมย์", "province": "บุรีรัมย์", "egpId": "69019335313", "projectTitle": "ซื้อSUCRALFATE 1 G/5 ML ORAL SUSP, 240 ML/ BOT โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 200, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 78752.0, "medianPrice": 78752.0, "winnerDate": "23/01/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 91, "origRank": 242, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลนครพิงค์", "province": "เชียงใหม่", "egpId": "69039311584", "projectTitle": "ซื้อSUCRALFATE 1 GM/5ML SUSPENSION IN 60 ML  โดยวิธีเฉพาะเจาะจง", "category": "60mL", "categoryLabel": "2. ขนาดขวด 60 mL (Oral Suspension 60 mL)", "qty": 300, "unitName": "ขวด (60 mL)", "announceDate": "-", "budget": 32100.0, "medianPrice": 32100.0, "winnerDate": "21/01/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 92, "origRank": 243, "hospital": "โรงพยาบาลราชบุรี", "province": "ราชบุรี", "egpId": "69029070042", "projectTitle": "ซื้อยา SUCRALFATE ORAL SUSP 1 GM/5 ML, 5 ML. (20SACH/BOX) (PP69-0620) โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6600, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 98868.0, "medianPrice": 98868.0, "winnerDate": "21/01/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 93, "origRank": 246, "hospital": "โรงพยาบาลพระปกเกล้า", "province": "จันทบุรี", "egpId": "69019338310", "projectTitle": "ซื้อSucralfate ๑gm/๕ml oral suspension ๕ml,๒๐ ซอง   จำนวน   ๑๕๐  กล่อง โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 3000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 44940.0, "medianPrice": 44940.0, "winnerDate": "15/01/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 94, "origRank": 247, "hospital": "โรงพยาบาลสมเด็จพระปิ่นเกล้า", "province": "กรุงเทพมหานคร", "egpId": "69039188191", "projectTitle": "ซื้อSucralfate (Ulcefate) Susp 1 g/5 ml, 240 ml , ย2359/69 โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 70, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 27563.2, "medianPrice": 27563.2, "winnerDate": "15/01/2569", "status": "อนุมัติสั่งซื้อสั่งจ้างและประกาศผู้ชนะการเสนอราคา"}, {"id": 95, "origRank": 251, "hospital": "โรงพยาบาลลำปาง", "province": "ลำปาง", "egpId": "69019051725", "projectTitle": "ซื้อยา  sucralfate 1 g/5 mL suspension 240 mL 80 bottle (208860). โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 80, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 31500.8, "medianPrice": 31500.8, "winnerDate": "08/01/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 96, "origRank": 254, "hospital": "โรงพยาบาลราชบุรี", "province": "ราชบุรี", "egpId": "69019335801", "projectTitle": "ซื้อยา SUCRALFATE ORAL SUSP 1 GM/5 ML, 5 ML.(20SACH/BOX) (PP69-0561) โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6600, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 98868.0, "medianPrice": 98868.0, "winnerDate": "13/01/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 97, "origRank": 255, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลสุราษฎร์ธานี", "province": "สุราษฎร์ธานี", "egpId": "69039138268", "projectTitle": "ซื้อยา sucralfate 1 g/5 mL oral suspension, 5 mL sachet โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 8000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 119840.0, "medianPrice": 119840.0, "winnerDate": "12/01/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 98, "origRank": 259, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลหาดใหญ่", "province": "สงขลา", "egpId": "69059046707", "projectTitle": "ซื้อSUCRALFATE 1 GM/5 ML SUSP. 240 ML (ULCEFATE ) จำนวน 50 x 1 BOT มูลค่า 19,688.00 บาท (ใบสั่งซื้อเลขที่  6902628) โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 50, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 19688.0, "medianPrice": 19688.0, "winnerDate": "08/01/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 99, "origRank": 262, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลนครปฐม", "province": "นครปฐม", "egpId": "69019424762", "projectTitle": "ซื้อยา SUCRALFATE SUSPENSION 1 G/5 ML, 240 ML   โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 1260, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 496137.6, "medianPrice": 496137.6, "winnerDate": "07/01/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 100, "origRank": 266, "hospital": "โรงพยาบาลพุทธชินราช", "province": "พิษณุโลก", "egpId": "69019111441", "projectTitle": "ซื้อเวชภัณฑ์ยา Sucralfate suspension 1 g/5 ml โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 89880.0, "medianPrice": 89880.0, "winnerDate": "05/01/2569", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 101, "origRank": 269, "hospital": "โรงพยาบาลสมเด็จพระนางเจ้าสิริกิติ์", "province": "ชลบุรี", "egpId": "68129218919", "projectTitle": "ซื้อยา Sucralfate 1 G / 5 ML. x 240 ML. SUSP. ขนาดบรรจุ 1 BOTT. จำนวน 300 BOTT.   โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 300, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 118128.0, "medianPrice": 118128.0, "winnerDate": "09/12/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 102, "origRank": 274, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลพุทธโสธร", "province": "ฉะเชิงเทรา", "egpId": "69019011198", "projectTitle": "ซื้อSucralfate 1 g/5 mL oral suspension, 240 mL bottle โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 500, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 196880.0, "medianPrice": 196880.0, "winnerDate": "22/12/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 103, "origRank": 276, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลสุรินทร์", "province": "สุรินทร์", "egpId": "69029158862", "projectTitle": "ซื้อsucralfate 1 g/5 ml oral suspension 60 ml โดยวิธีเฉพาะเจาะจง", "category": "60mL", "categoryLabel": "2. ขนาดขวด 60 mL (Oral Suspension 60 mL)", "qty": 500, "unitName": "ขวด (60 mL)", "announceDate": "-", "budget": 53500.0, "medianPrice": 53500.0, "winnerDate": "18/12/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 104, "origRank": 278, "hospital": "โรงพยาบาลราชบุรี", "province": "ราชบุรี", "egpId": "69019053311", "projectTitle": "ซื้อยา SUCRALFATE ORAL SUSP 1 GM/5 ML, 5 ML. (20SACH/BOX) (PP69-0464) โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6600, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 98868.0, "medianPrice": 98868.0, "winnerDate": "17/12/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 105, "origRank": 280, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลนครพิงค์", "province": "เชียงใหม่", "egpId": "69029317259", "projectTitle": "ซื้อ SUCRALFATE 1 GM/5ML SUSPENSION IN 60 ML  โดยวิธีเฉพาะเจาะจง", "category": "60mL", "categoryLabel": "2. ขนาดขวด 60 mL (Oral Suspension 60 mL)", "qty": 400, "unitName": "ขวด (60 mL)", "announceDate": "-", "budget": 42800.0, "medianPrice": 42800.0, "winnerDate": "15/12/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 106, "origRank": 285, "hospital": "โรงพยาบาลตะกั่วป่า", "province": "พังงา", "egpId": "68129263982", "projectTitle": "ซื้อยาในบัญชียาหลักแห่งชาติ Sucralfate 1 g/5 mL oral suspension, 240 mL bottle  จำนวน 60 ขวด  โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 60, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 23625.6, "medianPrice": 23625.6, "winnerDate": "12/12/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 107, "origRank": 293, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลสุราษฎร์ธานี", "province": "สุราษฎร์ธานี", "egpId": "69029194686", "projectTitle": "ซื้อยา sucralfate 1 g/5 mL oral suspension, 5 mL sachet โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 8000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 119840.0, "medianPrice": 119840.0, "winnerDate": "08/12/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 108, "origRank": 295, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลนครพิงค์", "province": "เชียงใหม่", "egpId": "69029108303", "projectTitle": "ซื้อSUCRALFATE 1 GM/5ML SUSPENSION IN 60 ML โดยวิธีเฉพาะเจาะจง", "category": "60mL", "categoryLabel": "2. ขนาดขวด 60 mL (Oral Suspension 60 mL)", "qty": 300, "unitName": "ขวด (60 mL)", "announceDate": "-", "budget": 32100.0, "medianPrice": 32100.0, "winnerDate": "08/12/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 109, "origRank": 298, "hospital": "โรงพยาบาลราชบุรี", "province": "ราชบุรี", "egpId": "68129412485", "projectTitle": "ซื้อยา SUCRALFATE ORAL SUSP 1 GM/5 ML, 5 ML. (20SACH/BOX) (PP69-0411) โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6600, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 98868.0, "medianPrice": 98868.0, "winnerDate": "04/12/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 110, "origRank": 300, "hospital": "โรงพยาบาลลำปาง", "province": "ลำปาง", "egpId": "68119541165", "projectTitle": "ซื้อยา sucralfate 1 g/5 mL oral suspension 240 mL 100 bottle (208860) โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 100, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 39376.0, "medianPrice": 39376.0, "winnerDate": "02/12/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 111, "origRank": 302, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลนครปฐม", "province": "นครปฐม", "egpId": "68129492716", "projectTitle": "ซื้อยา SUCRALFATE 1 G/5 ML SUSPENSION, 240 ML   โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 1250, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 492200.0, "medianPrice": 492200.0, "winnerDate": "03/12/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 112, "origRank": 311, "hospital": "โรงพยาบาลพัทลุง", "province": "พัทลุง", "egpId": "69019312816", "projectTitle": "ซื้อSUCRALFATE SUSP. 1 G/5 ML., 240 ML. โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 100, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 39376.0, "medianPrice": 39376.0, "winnerDate": "26/11/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 113, "origRank": 315, "hospital": "โรงพยาบาลสมเด็จพระเจ้าตากสินมหาราช", "province": "ตาก", "egpId": "68119548744", "projectTitle": "ซื้อSUCRALFATE GEL 1 GM. 5 ML. โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 4000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 59920.0, "medianPrice": 59920.0, "winnerDate": "21/11/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 114, "origRank": 316, "hospital": "โรงพยาบาลสมุทรปราการ", "province": "สมุทรปราการ", "egpId": "68119488408", "projectTitle": "ซื้อsucralfate 1 g/5 mL oral suspension, 240 mL  โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 240, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 94502.4, "medianPrice": 94502.4, "winnerDate": "20/11/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 115, "origRank": 317, "hospital": "โรงพยาบาลพุทธชินราช", "province": "พิษณุโลก", "egpId": "68119406838", "projectTitle": "ซื้อเวชภัณฑ์ยา Sucralfate suspension 1 g/5 ml โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 5800, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 86884.0, "medianPrice": 86884.0, "winnerDate": "20/11/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 116, "origRank": 320, "hospital": "โรงพยาบาลราชบุรี", "province": "ราชบุรี", "egpId": "68129031361", "projectTitle": "ซื้อยา SUCRALFATE ORAL SUSP 1 GM/5 ML, 5 ML. (20SACH/BOX) (PP69-0339) โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6600, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 98868.0, "medianPrice": 98868.0, "winnerDate": "19/11/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 117, "origRank": 323, "hospital": "โรงพยาบาลลำปาง", "province": "ลำปาง", "egpId": "68119153802", "projectTitle": "ซื้อยา sucralfate 1 g/5 mL suspension 240 mL 50 bottle (208860).  โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 50, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 19688.0, "medianPrice": 19688.0, "winnerDate": "10/11/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 118, "origRank": 325, "hospital": "โรงพยาบาลเชียงรายประชานุเคราะห์", "province": "เชียงราย", "egpId": "68119484936", "projectTitle": "ซื้อ Sucralfate 1 g/5 mL oral suspension 5 mL -sachet โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 600, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 8988.0, "medianPrice": 8988.0, "winnerDate": "13/11/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 119, "origRank": 327, "hospital": "โรงพยาบาลมหาสารคาม", "province": "มหาสารคาม", "egpId": "68119400519", "projectTitle": "ซื้อยา Sucralfate 1 g/5 ml susp., 240 ml  โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 50, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 19688.0, "medianPrice": 19688.0, "winnerDate": "11/11/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 120, "origRank": 329, "hospital": "โรงพยาบาลสมเด็จพระปิ่นเกล้า", "province": "กรุงเทพมหานคร", "egpId": "69019445747", "projectTitle": "ซื้อ Sucralfate (Ulcefate) Susp 1 g/5 ml , 240 ml , 1s , 70BOT , ย489/69 โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 70, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 27563.2, "medianPrice": 27563.2, "winnerDate": "12/11/2568", "status": "อนุมัติสั่งซื้อสั่งจ้างและประกาศผู้ชนะการเสนอราคา"}, {"id": 121, "origRank": 331, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลสุราษฎร์ธานี", "province": "สุราษฎร์ธานี", "egpId": "69019483809", "projectTitle": "ซื้อยา sucralfate 1 g/5 mL oral suspension, 5 mL sachet โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 8000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 119840.0, "medianPrice": 119840.0, "winnerDate": "11/11/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 122, "origRank": 332, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลนครปฐม", "province": "นครปฐม", "egpId": "68129001358", "projectTitle": "ซื้อยา SUCRALFATE SUSPENSION 1 GM/5 ML, 240 ML โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 1000, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 393760.0, "medianPrice": 393760.0, "winnerDate": "11/11/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 123, "origRank": 334, "hospital": "โรงพยาบาลพระปกเกล้า", "province": "จันทบุรี", "egpId": "68119473730", "projectTitle": "ซื้อSucralfate ๑gm/๕ml oral suspension ๕ml ๒๐ ซอง  จำนวน ๑๕๐ กล่อง โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 3000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 44940.0, "medianPrice": 44940.0, "winnerDate": "07/11/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 124, "origRank": 338, "hospital": "โรงพยาบาลราชบุรี", "province": "ราชบุรี", "egpId": "68129257472", "projectTitle": "ซื้อยา SUCRALFATE ORAL SUSP 1 GM/5 ML, 5 ML. (20SACH/BOX) (PP69-0252) โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6600, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 98868.0, "medianPrice": 98868.0, "winnerDate": "04/11/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 125, "origRank": 340, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลนครพิงค์", "province": "เชียงใหม่", "egpId": "68109496587", "projectTitle": "ซื้อSUCRALFATE 1 GM/5 ML SUSPENSION IN 60 ML โดยวิธีเฉพาะเจาะจง", "category": "60mL", "categoryLabel": "2. ขนาดขวด 60 mL (Oral Suspension 60 mL)", "qty": 360, "unitName": "ขวด (60 mL)", "announceDate": "-", "budget": 38520.0, "medianPrice": 38520.0, "winnerDate": "03/10/2568", "status": "ยกเลิกโครงการ"}, {"id": 126, "origRank": 341, "hospital": "งานพัสดุหมวดเวชภัณฑ์ยา", "province": "มหาสารคาม", "egpId": "68129257564", "projectTitle": "ซื้อSucralfate Susp 1 g/5 ml-240 ml โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 50, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 19688.0, "medianPrice": 19688.0, "winnerDate": "03/11/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 127, "origRank": 342, "hospital": "โรงพยาบาลมหาวชิราลงกรณธัญบุรี", "province": "ปทุมธานี", "egpId": "68109461030", "projectTitle": "ซื้อเวชภัณฑ์ยา Sucralfate oral suspension 1,000 mg/5 ml (5 ml) จำนวน 100 กล่อง ประจำปีงบประมาณ พ.ศ.2569 โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 2000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 29960.0, "medianPrice": 29960.0, "winnerDate": "31/10/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 128, "origRank": 343, "hospital": "โรงพยาบาลเชียงรายประชานุเคราะห์", "province": "เชียงราย", "egpId": "68119240710", "projectTitle": "ซื้อSucralfate 1 g/5 mL oral suspension 5 mL -sachet โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 600, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 8988.0, "medianPrice": 8988.0, "winnerDate": "03/11/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 129, "origRank": 344, "hospital": "โรงพยาบาลสิงห์บุรี", "province": "สิงห์บุรี", "egpId": "68109478896", "projectTitle": "ซื้อsucralfate โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 160, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 63001.6, "medianPrice": 63001.6, "winnerDate": "03/11/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 130, "origRank": 349, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลสุราษฎร์ธานี", "province": "สุราษฎร์ธานี", "egpId": "69019304987", "projectTitle": "ซื้อยา sucralfate 1 g/5 mL oral suspension, 5 mL sachet โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 89880.0, "medianPrice": 89880.0, "winnerDate": "28/10/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 131, "origRank": 350, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลนครพิงค์", "province": "เชียงใหม่", "egpId": "68129095577", "projectTitle": "ซื้อSUCRALFATE 1 GM/5ML SUSPENSION IN 60 ML โดยวิธีเฉพาะเจาะจง", "category": "60mL", "categoryLabel": "2. ขนาดขวด 60 mL (Oral Suspension 60 mL)", "qty": 300, "unitName": "ขวด (60 mL)", "announceDate": "-", "budget": 32100.0, "medianPrice": 32100.0, "winnerDate": "28/10/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 132, "origRank": 352, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลนครปฐม", "province": "นครปฐม", "egpId": "68119018895", "projectTitle": "ซื้อยา SUCRALFATE SUSPENSION 1 G/5 ML, 240 ML โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 1000, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 393760.0, "medianPrice": 393760.0, "winnerDate": "28/10/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 133, "origRank": 357, "hospital": "คณะแพทยศาสตร์", "province": "ชลบุรี", "egpId": "68109232051", "projectTitle": "ซื้อยา Sucralfate 1 gm/5ml suspension 240 ml  จำนวน 400 ขวด โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 400, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 157504.0, "medianPrice": 157504.0, "winnerDate": "21/10/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 134, "origRank": 360, "hospital": "โรงพยาบาลราชบุรี", "province": "ราชบุรี", "egpId": "68119164849", "projectTitle": "ซื้อยา SUCRALFATE ORAL SUSP 1 GM/5 ML, 5 ML.(20SACH/BOX) (PP69-0159) โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6600, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 98868.0, "medianPrice": 98868.0, "winnerDate": "22/10/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 135, "origRank": 366, "hospital": "โรงพยาบาลพุทธชินราช", "province": "พิษณุโลก", "egpId": "68109373952", "projectTitle": "ซื้อเวชภัณฑ์ยา Sucralfate suspension 1 g/5 ml โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 89880.0, "medianPrice": 89880.0, "winnerDate": "16/10/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 136, "origRank": 367, "hospital": "โรงพยาบาลเชียงรายประชานุเคราะห์", "province": "เชียงราย", "egpId": "68109392520", "projectTitle": "ซื้อSucralfate 1 g/5 mL oral suspension 5 mL -sachet โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 400, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 5992.0, "medianPrice": 5992.0, "winnerDate": "16/10/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 137, "origRank": 368, "hospital": "โรงพยาบาลปัตตานี", "province": "ปัตตานี", "egpId": "68129396433", "projectTitle": "ซื้อยา Sucralfate 1g/5ml Oral suspension (GPU-810205) โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 8000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 119840.0, "medianPrice": 119840.0, "winnerDate": "14/10/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 138, "origRank": 372, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลหาดใหญ่", "province": "สงขลา", "egpId": "69019133615", "projectTitle": "ซื้อSUCRALFATE 1 GM/5 ML SUSP. 240 ML (ULCEFATE ) จำนวน 60 x 1 BOT มูลค่า 23,625.60 บาท (ใบสั่งซื้อเลขที่  6900562) โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 60, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 23625.6, "medianPrice": 23625.6, "winnerDate": "10/10/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 139, "origRank": 377, "hospital": "โรงพยาบาลสมเด็จพระเจ้าตากสินมหาราช", "province": "ตาก", "egpId": "68109296115", "projectTitle": "ซื้อSUCRALFATE GEL 1 GM. 5 ML. โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 4000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 59920.0, "medianPrice": 59920.0, "winnerDate": "09/10/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 140, "origRank": 378, "hospital": "โรงพยาบาลสมเด็จพระสังฆราช (อมฺพรมหาเถร)", "province": "ราชบุรี", "egpId": "68109192434", "projectTitle": "ซื้อsucralfate 1 g/5 mL oral suspension, 240 mL bottle โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 30, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 11812.8, "medianPrice": 11812.8, "winnerDate": "08/10/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 141, "origRank": 381, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลนครปฐม", "province": "นครปฐม", "egpId": "68109234908", "projectTitle": "ซื้อยา SUCRALFATE SUSPENSION 1 GM/5 ML, 240 ML โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 1000, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 393760.0, "medianPrice": 393760.0, "winnerDate": "08/10/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 142, "origRank": 385, "hospital": "โรงพยาบาลราชบุรี", "province": "ราชบุรี", "egpId": "68109335289", "projectTitle": "ซื้อยา SUCRALFATE ORAL SUSP 1 GM/5 ML, 5 ML.(20SACH/BOX) (PP69-0031) โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6600, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 98868.0, "medianPrice": 98868.0, "winnerDate": "06/10/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 143, "origRank": 386, "hospital": "โรงพยาบาลสิงห์บุรี", "province": "สิงห์บุรี", "egpId": "68109177447", "projectTitle": "ซื้อsucralfate โดยวิธีเฉพาะเจาะจง", "category": "240mL", "categoryLabel": "1. ขนาดขวด 240 mL (Oral Suspension 240 mL)", "qty": 120, "unitName": "ขวด (240 mL)", "announceDate": "-", "budget": 47251.2, "medianPrice": 47251.2, "winnerDate": "06/10/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 144, "origRank": 387, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลสุราษฎร์ธานี", "province": "สุราษฎร์ธานี", "egpId": "68129556855", "projectTitle": "ซื้อยา sucralfate 1 g/5 mL oral suspension, 5 mL sachet โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 89880.0, "medianPrice": 89880.0, "winnerDate": "03/10/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 145, "origRank": 388, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลนครพิงค์", "province": "เชียงใหม่", "egpId": "68119036172", "projectTitle": "ซื้อSUCRALFATE 1 GM/5 ML SUSPENSION IN 60 ML โดยวิธีเฉพาะเจาะจง", "category": "60mL", "categoryLabel": "2. ขนาดขวด 60 mL (Oral Suspension 60 mL)", "qty": 360, "unitName": "ขวด (60 mL)", "announceDate": "-", "budget": 38520.0, "medianPrice": 38520.0, "winnerDate": "03/10/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 146, "origRank": 393, "hospital": "โรงพยาบาลพระปกเกล้า", "province": "จันทบุรี", "egpId": "68109281408", "projectTitle": "ซื้อSucralfate ๑gm/๕ml oral suspension ๕ml ๒๐ ซอง   จำนวน ๑๕๐ กล่อง โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 3000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 44940.0, "medianPrice": 44940.0, "winnerDate": "01/10/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 147, "origRank": 395, "hospital": "โรงพยาบาลเชียงรายประชานุเคราะห์", "province": "เชียงราย", "egpId": "68109176728", "projectTitle": "ซื้อSucralfate 1 g/5 mL oral suspension 5 mL -sachet โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 400, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 5992.0, "medianPrice": 5992.0, "winnerDate": "01/10/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 148, "origRank": 399, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลสุราษฎร์ธานี", "province": "สุราษฎร์ธานี", "egpId": "68129435130", "projectTitle": "ซื้อยา sucralfate 1 g/5 mL oral suspension, 5 mL sachet โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 89880.0, "medianPrice": 89880.0, "winnerDate": "17/09/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 149, "origRank": 400, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลสุราษฎร์ธานี", "province": "สุราษฎร์ธานี", "egpId": "68129339170", "projectTitle": "ซื้อยา sucralfate 1 g/5 mL oral suspension, 5 mL sachet โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 89880.0, "medianPrice": 89880.0, "winnerDate": "01/09/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 150, "origRank": 401, "hospital": "โรงพยาบาลปัตตานี", "province": "ปัตตานี", "egpId": "68119106917", "projectTitle": "ซื้อยา Sucralfate 1g/5ml Oral suspension (GPU-810205) โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 8000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 119840.0, "medianPrice": 119840.0, "winnerDate": "08/08/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 151, "origRank": 402, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลสุราษฎร์ธานี", "province": "สุราษฎร์ธานี", "egpId": "68109243564", "projectTitle": "ซื้อยา sucralfate 1 g/5 mL oral suspension, 5 mL sachet โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 89880.0, "medianPrice": 89880.0, "winnerDate": "14/07/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 152, "origRank": 403, "hospital": "โรงพยาบาลปัตตานี", "province": "ปัตตานี", "egpId": "68109092031", "projectTitle": "ซื้อยา Sucralfate 1g/5ml Oral suspension (GPU-810205) โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 89880.0, "medianPrice": 89880.0, "winnerDate": "04/07/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}, {"id": 153, "origRank": 404, "hospital": "กลุ่มงานเภสัชกรรม โรงพยาบาลสุราษฎร์ธานี", "province": "สุราษฎร์ธานี", "egpId": "68109060212", "projectTitle": "ซื้อยา sucralfate 1 g/5 mL oral suspension, 5 mL sachet โดยวิธีเฉพาะเจาะจง", "category": "sachet", "categoryLabel": "3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)", "qty": 6000, "unitName": "ซอง (5 mL)", "announceDate": "-", "budget": 89880.0, "medianPrice": 89880.0, "winnerDate": "23/06/2568", "status": "จัดทำสัญญา/บริหารสัญญา"}];
+
+    const state = {
+      records: JSON.parse(JSON.stringify(INITIAL_RECORDS)),
+      filterCategory: 'all',
+      filterProvince: 'all',
+      searchQuery: '',
+      sachetUnitMode: 'box',
+      topMetric: 'budget',
+      autoCalcBudget: true,
+      unitPrices: {
+        '240mL': 393.76,
+        '60mL': 107.00,
+        'sachet': 14.98
+      }
+    };
+
+    let pieChartInstance = null;
+    let qtyBarChartInstance = null;
+    let topHospChartInstance = null;
+    let toastTimer = null;
+
+    function showToast(msg) {
+      const banner = document.getElementById('toastBanner');
+      const textEl = document.getElementById('toastMessage');
+      textEl.textContent = msg;
+      banner.classList.remove('hidden');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        banner.classList.add('hidden');
+      }, 2600);
+    }
+
+    function formatNumber(num, decimals = 0) {
+      return Number(num || 0).toLocaleString('th-TH', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+      });
+    }
+
+    function getCategoryMeta(catCode) {
+      if (catCode === '240mL') {
+        return {
+          label: '1. ขนาดขวด 240 mL (Oral Suspension 240 mL)',
+          shortLabel: '1. ขวด 240 mL',
+          unitName: 'ขวด (240 mL)',
+          badgeClass: 'bg-blue-50 text-blue-800 border-blue-200'
+        };
+      }
+      if (catCode === '60mL') {
+        return {
+          label: '2. ขนาดขวด 60 mL (Oral Suspension 60 mL)',
+          shortLabel: '2. ขวด 60 mL',
+          unitName: 'ขวด (60 mL)',
+          badgeClass: 'bg-sky-50 text-sky-800 border-sky-200'
+        };
+      }
+      return {
+        label: '3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)',
+        shortLabel: '3. แบบซอง 5 mL',
+        unitName: 'ซอง (5 mL)',
+        badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200'
+      };
+    }
+
+    function getFilteredRecords() {
+      return state.records.filter(r => {
+        if (state.filterCategory !== 'all' && r.category !== state.filterCategory) return false;
+        if (state.filterProvince !== 'all' && r.province !== state.filterProvince) return false;
+        if (state.searchQuery) {
+          const q = state.searchQuery.toLowerCase();
+          const matchHosp = (r.hospital || '').toLowerCase().includes(q);
+          const matchProv = (r.province || '').toLowerCase().includes(q);
+          const matchEgp = (r.egpId || '').toLowerCase().includes(q);
+          const matchTitle = (r.projectTitle || '').toLowerCase().includes(q);
+          if (!matchHosp && !matchProv && !matchEgp && !matchTitle) return false;
+        }
+        return true;
+      });
+    }
+
+    function populateProvinceDropdown() {
+      const select = document.getElementById('selectProvince');
+      const currentVal = state.filterProvince;
+      const provinces = Array.from(new Set(state.records.map(r => r.province))).sort((a, b) => a.localeCompare(b, 'th'));
+      select.innerHTML = `<option value="all">ทุกจังหวัด (${provinces.length} จังหวัด)</option>` +
+        provinces.map(p => `<option value="${p}">${p}</option>`).join('');
+      select.value = provinces.includes(currentVal) ? currentVal : 'all';
+    }
+
+    function renderKpisAndSummaries() {
+      const active = getFilteredRecords();
+
+      const catStats = {
+        '240mL': { count: 0, qty: 0, budget: 0, median: 0 },
+        '60mL': { count: 0, qty: 0, budget: 0, median: 0 },
+        'sachet': { count: 0, qty: 0, budget: 0, median: 0 }
+      };
+
+      let totalBudget = 0;
+      let totalMedian = 0;
+      const hospSet = new Set();
+
+      active.forEach(r => {
+        const c = catStats[r.category] || catStats['240mL'];
+        c.count += 1;
+        c.qty += Number(r.qty || 0);
+        c.budget += Number(r.budget || 0);
+        c.median += Number(r.medianPrice || 0);
+        totalBudget += Number(r.budget || 0);
+        totalMedian += Number(r.medianPrice || 0);
+        hospSet.add(r.hospital);
+      });
+
+      const denom = totalBudget > 0 ? totalBudget : 1;
+      const share240 = (catStats['240mL'].budget / denom) * 100;
+      const share60 = (catStats['60mL'].budget / denom) * 100;
+      const shareSachet = (catStats['sachet'].budget / denom) * 100;
+
+      // Update KPI Cards
+      document.getElementById('kpi240Projects').textContent = `${formatNumber(catStats['240mL'].count)} โครงการ`;
+      document.getElementById('kpi240Qty').textContent = `${formatNumber(catStats['240mL'].qty)} ขวด`;
+      document.getElementById('kpi240Budget').textContent = `฿${formatNumber(catStats['240mL'].budget, 2)}`;
+      document.getElementById('kpi240Share').textContent = `${share240.toFixed(1)}%`;
+
+      document.getElementById('kpi60Projects').textContent = `${formatNumber(catStats['60mL'].count)} โครงการ`;
+      document.getElementById('kpi60Qty').textContent = `${formatNumber(catStats['60mL'].qty)} ขวด`;
+      document.getElementById('kpi60Budget').textContent = `฿${formatNumber(catStats['60mL'].budget, 2)}`;
+      document.getElementById('kpi60Share').textContent = `${share60.toFixed(1)}%`;
+
+      const sachetBoxes = Math.round(catStats['sachet'].qty / 20);
+      document.getElementById('kpiSachetProjects').textContent = `${formatNumber(catStats['sachet'].count)} โครงการ`;
+      document.getElementById('kpiSachetQty').textContent = `${formatNumber(catStats['sachet'].qty)} ซอง`;
+      document.getElementById('kpiSachetBoxes').innerHTML = `คิดเป็น ${formatNumber(sachetBoxes)} กล่อง • <strong id="kpiSachetBudget" class="text-slate-900">฿${formatNumber(catStats['sachet'].budget, 2)}</strong>`;
+      document.getElementById('kpiSachetShare').textContent = `${shareSachet.toFixed(1)}%`;
+
+      document.getElementById('kpiTotalProjects').textContent = `${formatNumber(active.length)} โครงการ`;
+      document.getElementById('kpiTotalBudget').textContent = `฿${formatNumber(totalBudget, 2)}`;
+      document.getElementById('kpiTotalMedian').textContent = `฿${formatNumber(totalMedian, 2)}`;
+      document.getElementById('kpiTotalHospitals').textContent = `${formatNumber(hospSet.size)} โรงพยาบาล`;
+
+      // Render Packaging Summary Table with editable benchmark unit price
+      const pkgRowsHtml = [
+        {
+          code: '240mL',
+          name: '1. ขนาดขวด 240 mL (Oral Suspension)',
+          count: catStats['240mL'].count,
+          qtyText: `${formatNumber(catStats['240mL'].qty)} ขวด`,
+          unitPrice: state.unitPrices['240mL'],
+          unitSuffix: 'บ./ขวด',
+          budget: catStats['240mL'].budget,
+          share: share240
+        },
+        {
+          code: '60mL',
+          name: '2. ขนาดขวด 60 mL (Oral Suspension)',
+          count: catStats['60mL'].count,
+          qtyText: `${formatNumber(catStats['60mL'].qty)} ขวด`,
+          unitPrice: state.unitPrices['60mL'],
+          unitSuffix: 'บ./ขวด',
+          budget: catStats['60mL'].budget,
+          share: share60
+        },
+        {
+          code: 'sachet',
+          name: '3. แบบซอง 5 mL (Sachet 20 ซอง/กล่อง)',
+          count: catStats['sachet'].count,
+          qtyText: `${formatNumber(catStats['sachet'].qty)} ซอง (${formatNumber(sachetBoxes)} กล่อง)`,
+          unitPrice: state.unitPrices['sachet'],
+          unitSuffix: 'บ./ซอง',
+          budget: catStats['sachet'].budget,
+          share: shareSachet
+        }
+      ].map(row => `
+        <tr class="hover:bg-slate-50">
+          <td class="py-2.5 px-3 font-semibold text-slate-800">${row.name}</td>
+          <td class="py-2.5 px-2 text-center font-medium">${formatNumber(row.count)}</td>
+          <td class="py-2.5 px-3 text-right font-bold text-slate-900">${row.qtyText}</td>
+          <td class="py-2.5 px-2 text-right">
+            <div class="inline-flex items-center gap-1">
+              <input type="number" step="0.01" data-unit-cat="${row.code}" value="${row.unitPrice}"
+                class="unit-price-input editable-input w-20 text-right border border-slate-300 rounded px-1.5 py-1 text-xs font-semibold bg-amber-50/60 text-slate-900"
+                title="แก้ราคาต่อหน่วยแล้วกด Enter เพื่อจำลองงบประมาณใหม่ทั้งกลุ่ม" />
+              <span class="text-[11px] text-slate-500">${row.unitSuffix}</span>
+            </div>
+          </td>
+          <td class="py-2.5 px-3 text-right font-bold text-slate-900">
+            ฿${formatNumber(row.budget, 2)}
+            <span class="text-[11px] text-slate-500 font-normal ml-1">(${row.share.toFixed(1)}%)</span>
+          </td>
+        </tr>
+      `).join('');
+
+      const totalRowHtml = `
+        <tr class="bg-slate-100 font-bold text-slate-900 border-t-2 border-slate-300">
+          <td class="py-2.5 px-3">รวมทั้งสิ้น (เฉพาะระบุจำนวนแน่นอน)</td>
+          <td class="py-2.5 px-2 text-center">${formatNumber(active.length)}</td>
+          <td class="py-2.5 px-3 text-right">${formatNumber(catStats['240mL'].qty + catStats['60mL'].qty)} ขวด + ${formatNumber(catStats['sachet'].qty)} ซอง</td>
+          <td class="py-2.5 px-2 text-right text-slate-500">-</td>
+          <td class="py-2.5 px-3 text-right text-blue-900">฿${formatNumber(totalBudget, 2)} (100%)</td>
+        </tr>
+      `;
+      document.getElementById('pkgSummaryBody').innerHTML = pkgRowsHtml + totalRowHtml;
+
+      // Attach listeners to unit-price inputs
+      document.querySelectorAll('.unit-price-input').forEach(inp => {
+        inp.addEventListener('change', (e) => {
+          const catCode = e.target.getAttribute('data-unit-cat');
+          const newPrice = parseFloat(e.target.value);
+          if (!isNaN(newPrice) && newPrice >= 0) {
+            state.unitPrices[catCode] = newPrice;
+            state.records.forEach(r => {
+              if (r.category === catCode) {
+                r.budget = Math.round(r.qty * newPrice * 100) / 100;
+              }
+            });
+            renderAll();
+            showToast(`คำนวณงบประมาณกลุ่ม ${catCode} ใหม่ด้วยราคา ฿${newPrice} ต่อหน่วยเรียบร้อยแล้ว`);
+          }
+        });
+      });
+
+      // Compute Top 10 Hospitals
+      const hospMap = {};
+      active.forEach(r => {
+        if (!hospMap[r.hospital]) {
+          hospMap[r.hospital] = {
+            hospital: r.hospital,
+            province: r.province,
+            count: 0,
+            budget: 0,
+            q240: 0,
+            q60: 0,
+            qSachet: 0
+          };
+        }
+        const h = hospMap[r.hospital];
+        h.count += 1;
+        h.budget += Number(r.budget || 0);
+        if (r.category === '240mL') h.q240 += Number(r.qty || 0);
+        else if (r.category === '60mL') h.q60 += Number(r.qty || 0);
+        else h.qSachet += Number(r.qty || 0);
+      });
+
+      const sortedHosps = Object.values(hospMap).sort((a, b) => {
+        if (state.topMetric === 'projects') return b.count - a.count || b.budget - a.budget;
+        return b.budget - a.budget;
+      }).slice(0, 10);
+
+      document.getElementById('topHospTableBody').innerHTML = sortedHosps.map((h, i) => {
+        const parts = [];
+        if (h.q240 > 0) parts.push(`${formatNumber(h.q240)} ขวด (240mL)`);
+        if (h.q60 > 0) parts.push(`${formatNumber(h.q60)} ขวด (60mL)`);
+        if (h.qSachet > 0) parts.push(`${formatNumber(h.qSachet)} ซอง (${formatNumber(Math.round(h.qSachet/20))} กล่อง)`);
+        const shareH = ((h.budget / denom) * 100).toFixed(1);
+        return `
+          <tr class="hover:bg-slate-50">
+            <td class="py-2 px-2.5 text-center font-bold text-slate-600">${i + 1}</td>
+            <td class="py-2 px-3 font-semibold text-slate-800">
+              ${h.hospital} <span class="text-slate-500 font-normal">(${h.province})</span>
+            </td>
+            <td class="py-2 px-2.5 text-center text-slate-700">${parts.join(' + ')}</td>
+            <td class="py-2 px-3 text-right font-bold text-slate-900">฿${formatNumber(h.budget, 2)}</td>
+            <td class="py-2 px-2.5 text-right font-semibold text-blue-700">${shareH}%</td>
+          </tr>
+        `;
+      }).join('');
+
+      updateCharts(catStats, sortedHosps);
+    }
+
+    function updateCharts(catStats, sortedHosps) {
+      // 1. Donut Chart
+      const ctxPie = document.getElementById('chartBudgetPie').getContext('2d');
+      const pieData = [
+        Math.round(catStats['240mL'].budget * 100) / 100,
+        Math.round(catStats['60mL'].budget * 100) / 100,
+        Math.round(catStats['sachet'].budget * 100) / 100
+      ];
+      if (pieChartInstance) pieChartInstance.destroy();
+      pieChartInstance = new Chart(ctxPie, {
+        type: 'doughnut',
+        data: {
+          labels: ['1. ขวด 240 mL', '2. ขวด 60 mL', '3. แบบซอง 5 mL'],
+          datasets: [{
+            data: pieData,
+            backgroundColor: ['#1e3a8a', '#0284c7', '#059669'],
+            borderWidth: 2,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '58%',
+          plugins: {
+            legend: { position: 'bottom', labels: { font: { family: 'Sarabun', size: 11 } } },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `${ctx.label}: ฿${formatNumber(ctx.raw, 2)}`
+              }
+            }
+          }
+        }
+      });
+
+      // 2. Quantity Bar Chart
+      const ctxQty = document.getElementById('chartQtyBar').getContext('2d');
+      const sachetVal = state.sachetUnitMode === 'box'
+        ? Math.round(catStats['sachet'].qty / 20)
+        : catStats['sachet'].qty;
+      const sachetLabel = state.sachetUnitMode === 'box'
+        ? '3. แบบซอง (กล่อง 20 ซอง)'
+        : '3. แบบซอง (จำนวนซอง)';
+
+      if (qtyBarChartInstance) qtyBarChartInstance.destroy();
+      qtyBarChartInstance = new Chart(ctxQty, {
+        type: 'bar',
+        data: {
+          labels: ['1. ขวด 240 mL (ขวด)', '2. ขวด 60 mL (ขวด)', sachetLabel],
+          datasets: [{
+            label: 'ปริมาณจัดซื้อ',
+            data: [catStats['240mL'].qty, catStats['60mL'].qty, sachetVal],
+            backgroundColor: ['#1e3a8a', '#0284c7', '#059669'],
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `จำนวน: ${formatNumber(ctx.raw)} หน่วย`
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { font: { family: 'Sarabun', size: 11 } }
+            },
+            x: {
+              ticks: { font: { family: 'Sarabun', size: 11 } }
+            }
+          }
+        }
+      });
+
+      // 3. Top 10 Hospitals Horizontal Bar Chart
+      const ctxTop = document.getElementById('chartTopHospitals').getContext('2d');
+      const labelsTop = sortedHosps.map((h, idx) => `${idx + 1}. ${h.hospital.replace('กลุ่มงานเภสัชกรรม ', '').replace('หน่วยงานจัดซื้อยาและเวชภัณฑ์ทางการแพทย์ ', '')}`);
+      const valuesTop = sortedHosps.map(h => state.topMetric === 'projects' ? h.count : h.budget);
+
+      if (topHospChartInstance) topHospChartInstance.destroy();
+      topHospChartInstance = new Chart(ctxTop, {
+        type: 'bar',
+        data: {
+          labels: labelsTop,
+          datasets: [{
+            label: state.topMetric === 'projects' ? 'จำนวนโครงการ' : 'งบประมาณ (บาท)',
+            data: valuesTop,
+            backgroundColor: '#2563eb',
+            borderRadius: 4
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => state.topMetric === 'projects'
+                  ? `${formatNumber(ctx.raw)} โครงการ`
+                  : `฿${formatNumber(ctx.raw, 2)}`
+              }
+            }
+          },
+          scales: {
+            x: {
+              beginAtZero: true,
+              ticks: { font: { family: 'Sarabun', size: 10 } }
+            },
+            y: {
+              ticks: { font: { family: 'Sarabun', size: 10 } }
+            }
+          }
+        }
+      });
+    }
+
+    function renderProjectTable() {
+      const active = getFilteredRecords();
+      document.getElementById('tableCountBadge').textContent = formatNumber(active.length);
+
+      const tbody = document.getElementById('projectTableBody');
+      tbody.innerHTML = active.map((r, idx) => {
+        const meta = getCategoryMeta(r.category);
+        return `
+          <tr class="hover:bg-blue-50/40 transition" data-row-id="${r.id}">
+            <td class="py-2 px-2.5 text-center font-semibold text-slate-600">${idx + 1}</td>
+            <td class="py-2 px-3">
+              <input type="text" data-field="hospital" data-id="${r.id}" value="${r.hospital.replace(/"/g, '&quot;')}"
+                class="row-edit-input editable-input w-full border border-transparent hover:border-slate-300 rounded px-2 py-1 text-xs font-semibold text-slate-900 bg-transparent" />
+            </td>
+            <td class="py-2 px-2.5 text-center">
+              <input type="text" data-field="province" data-id="${r.id}" value="${r.province.replace(/"/g, '&quot;')}"
+                class="row-edit-input editable-input w-24 text-center border border-transparent hover:border-slate-300 rounded px-1.5 py-1 text-xs text-slate-700 bg-transparent" />
+            </td>
+            <td class="py-2 px-2.5 text-center font-mono text-[11px] text-slate-500">${r.egpId}</td>
+            <td class="py-2 px-3">
+              <select data-field="category" data-id="${r.id}" class="row-edit-input editable-input text-xs border border-slate-200 rounded-lg px-2 py-1 font-medium ${meta.badgeClass}">
+                <option value="240mL" ${r.category === '240mL' ? 'selected' : ''}>1. ขวด 240 mL</option>
+                <option value="60mL" ${r.category === '60mL' ? 'selected' : ''}>2. ขวด 60 mL</option>
+                <option value="sachet" ${r.category === 'sachet' ? 'selected' : ''}>3. แบบซอง 5 mL</option>
+              </select>
+            </td>
+            <td class="py-2 px-3 text-right">
+              <input type="number" min="1" step="1" data-field="qty" data-id="${r.id}" value="${r.qty}"
+                class="row-edit-input editable-input w-24 text-right border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-blue-900 bg-amber-50/50" />
+            </td>
+            <td class="py-2 px-2.5 text-center text-[11px] text-slate-500">
+              ${r.category === 'sachet' ? `ซอง (${formatNumber(Math.round(r.qty/20))} กล่อง)` : meta.unitName}
+            </td>
+            <td class="py-2 px-3 text-right">
+              <input type="number" min="0" step="0.01" data-field="budget" data-id="${r.id}" value="${r.budget}"
+                class="row-edit-input editable-input w-28 text-right border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-slate-900 bg-white" />
+            </td>
+            <td class="py-2 px-3 text-right">
+              <input type="number" min="0" step="0.01" data-field="medianPrice" data-id="${r.id}" value="${r.medianPrice}"
+                class="row-edit-input editable-input w-28 text-right border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-700 bg-slate-50" />
+            </td>
+            <td class="py-2 px-2.5 text-center">
+              <button type="button" data-delete-id="${r.id}" class="btn-delete-row text-rose-600 hover:text-rose-800 hover:bg-rose-50 px-2 py-1 rounded font-semibold text-xs transition">
+                ลบ
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      // Attach listeners for inline editing
+      tbody.querySelectorAll('.row-edit-input').forEach(el => {
+        el.addEventListener('change', (e) => {
+          const id = parseInt(e.target.getAttribute('data-id'), 10);
+          const field = e.target.getAttribute('data-field');
+          const rec = state.records.find(item => item.id === id);
+          if (!rec) return;
+
+          if (field === 'qty') {
+            const newQty = Math.max(0, parseInt(e.target.value, 10) || 0);
+            rec.qty = newQty;
+            if (state.autoCalcBudget) {
+              const unitP = state.unitPrices[rec.category] || 393.76;
+              rec.budget = Math.round(newQty * unitP * 100) / 100;
+              rec.medianPrice = rec.budget;
+            }
+          } else if (field === 'budget' || field === 'medianPrice') {
+            rec[field] = Math.max(0, parseFloat(e.target.value) || 0);
+          } else if (field === 'category') {
+            rec.category = e.target.value;
+            const meta = getCategoryMeta(rec.category);
+            rec.categoryLabel = meta.label;
+            rec.unitName = meta.unitName;
+            if (state.autoCalcBudget) {
+              const unitP = state.unitPrices[rec.category] || 393.76;
+              rec.budget = Math.round(rec.qty * unitP * 100) / 100;
+              rec.medianPrice = rec.budget;
+            }
+          } else {
+            rec[field] = e.target.value;
+          }
+
+          populateProvinceDropdown();
+          renderAll();
+          showToast(`อัปเดตข้อมูลรายการที่ #${id} เรียบร้อยแล้ว`);
+        });
+      });
+
+      // Attach listeners for row deletion
+      tbody.querySelectorAll('.btn-delete-row').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const id = parseInt(e.currentTarget.getAttribute('data-delete-id'), 10);
+          state.records = state.records.filter(r => r.id !== id);
+          populateProvinceDropdown();
+          renderAll();
+          showToast(`ลบรายการที่ #${id} ออกจาก Dashboard แล้ว`);
+        });
+      });
+    }
+
+    function renderAll() {
+      renderKpisAndSummaries();
+      renderProjectTable();
+    }
+
+    // Wire top-level filter controls
+    document.querySelectorAll('.cat-filter-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        state.filterCategory = e.currentTarget.getAttribute('data-cat');
+        document.querySelectorAll('.cat-filter-btn').forEach(b => {
+          if (b.getAttribute('data-cat') === state.filterCategory) {
+            b.className = 'cat-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-900 text-white shadow-sm transition';
+          } else {
+            b.className = 'cat-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition';
+          }
+        });
+        renderAll();
+      });
+    });
+
+    document.getElementById('chkAutoCalcBudget').addEventListener('change', (e) => {
+      state.autoCalcBudget = e.target.checked;
+    });
+
+    document.getElementById('selectProvince').addEventListener('change', (e) => {
+      state.filterProvince = e.target.value;
+      renderAll();
+    });
+
+    document.getElementById('inputSearch').addEventListener('input', (e) => {
+      state.searchQuery = e.target.value.trim();
+      renderAll();
+    });
+
+    document.getElementById('selectSachetUnitMode').addEventListener('change', (e) => {
+      state.sachetUnitMode = e.target.value;
+      renderKpisAndSummaries();
+    });
+
+    document.getElementById('selectTopMetric').addEventListener('change', (e) => {
+      state.topMetric = e.target.value;
+      renderKpisAndSummaries();
+    });
+
+    // Modal controls for adding a new project
+    const addModal = document.getElementById('addModal');
+    function updateNewModalBudget() {
+      const cat = document.getElementById('newCategory').value;
+      const qty = parseFloat(document.getElementById('newQty').value) || 0;
+      const unitP = state.unitPrices[cat] || 393.76;
+      const calc = (qty * unitP).toFixed(2);
+      document.getElementById('newBudget').value = calc;
+      document.getElementById('newMedian').value = calc;
+    }
+
+    document.getElementById('newCategory').addEventListener('change', updateNewModalBudget);
+    document.getElementById('newQty').addEventListener('input', updateNewModalBudget);
+
+    document.getElementById('btnOpenAddModal').addEventListener('click', () => {
+      updateNewModalBudget();
+      addModal.classList.remove('hidden');
+    });
+    document.getElementById('btnCloseAddModal').addEventListener('click', () => addModal.classList.add('hidden'));
+    document.getElementById('btnCancelAddModal').addEventListener('click', () => addModal.classList.add('hidden'));
+
+    document.getElementById('btnConfirmAddProject').addEventListener('click', () => {
+      const hosp = document.getElementById('newHospital').value.trim() || 'โรงพยาบาลไม่ระบุชื่อ';
+      const prov = document.getElementById('newProvince').value.trim() || 'ไม่ระบุ';
+      const egpId = document.getElementById('newEgpId').value.trim() || '-';
+      const cat = document.getElementById('newCategory').value;
+      const qty = Math.max(1, parseInt(document.getElementById('newQty').value, 10) || 1);
+      const budget = Math.max(0, parseFloat(document.getElementById('newBudget').value) || 0);
+      const median = Math.max(0, parseFloat(document.getElementById('newMedian').value) || budget);
+      const meta = getCategoryMeta(cat);
+      const nextId = state.records.reduce((max, r) => Math.max(max, r.id), 0) + 1;
+
+      state.records.unshift({
+        id: nextId,
+        origRank: nextId,
+        hospital: hosp,
+        province: prov,
+        egpId: egpId,
+        projectTitle: `ซื้อยา Sucralfate (${meta.shortLabel}) จำนวน ${formatNumber(qty)} ${meta.unitName}`,
+        category: cat,
+        categoryLabel: meta.label,
+        qty: qty,
+        unitName: meta.unitName,
+        announceDate: '-',
+        budget: budget,
+        medianPrice: median,
+        winnerDate: '-',
+        status: 'จัดทำสัญญา/บริหารสัญญา'
+      });
+
+      addModal.classList.add('hidden');
+      populateProvinceDropdown();
+      renderAll();
+      showToast(`เพิ่มรายการสั่งซื้อของ ${hosp} เรียบร้อยแล้ว`);
+    });
+
+    document.getElementById('btnResetData').addEventListener('click', () => {
+      state.records = JSON.parse(JSON.stringify(INITIAL_RECORDS));
+      state.unitPrices = { '240mL': 393.76, '60mL': 107.00, 'sachet': 14.98 };
+      state.filterCategory = 'all';
+      state.filterProvince = 'all';
+      state.searchQuery = '';
+      document.getElementById('inputSearch').value = '';
+      populateProvinceDropdown();
+      renderAll();
+      showToast('รีเซ็ตข้อมูลกลับสู่ค่าเริ่มต้น (153 โครงการ) เรียบร้อยแล้ว');
+    });
+
+    document.getElementById('btnExportCsv').addEventListener('click', () => {
+      const active = getFilteredRecords();
+      const headers = ['ลำดับ', 'หน่วยงาน/โรงพยาบาล', 'จังหวัด', 'เลขที่โครงการ (e-GP)', 'รูปแบบบรรจุภัณฑ์', 'จำนวนหน่วย', 'หน่วยนับ', 'วงเงินงบประมาณ (บาท)', 'ราคากลาง (บาท)', 'วันที่ประกาศผู้ชนะ', 'สถานะโครงการ'];
+      const rows = active.map((r, i) => [
+        i + 1,
+        `"${(r.hospital || '').replace(/"/g, '""')}"`,
+        `"${(r.province || '').replace(/"/g, '""')}"`,
+        `"${(r.egpId || '').replace(/"/g, '""')}"`,
+        `"${(r.categoryLabel || '').replace(/"/g, '""')}"`,
+        r.qty,
+        `"${(r.unitName || '').replace(/"/g, '""')}"`,
+        r.budget.toFixed(2),
+        r.medianPrice.toFixed(2),
+        `"${(r.winnerDate || '').replace(/"/g, '""')}"`,
+        `"${(r.status || '').replace(/"/g, '""')}"`
+      ]);
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'รายการสั่งซื้อ_Sucralfate_เฉพาะระบุจำนวน_แก้ไขแล้ว.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('ดาวน์โหลดไฟล์ CSV สำหรับเปิดใน Excel เรียบร้อยแล้ว');
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+      populateProvinceDropdown();
+      renderAll();
+    });
+  </script>
+</body>
+</html>
